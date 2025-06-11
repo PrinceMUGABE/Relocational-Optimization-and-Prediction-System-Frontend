@@ -368,109 +368,6 @@ function Admin_Manage_Relocations() {
     },
   };
 
-  const handleAddUpdateRelocation = async (e) => {
-    e.preventDefault();
-
-    // Log the form data being submitted for debugging
-    console.log("Submitting form with locations:", {
-      origin_district: selectedOriginDistrict,
-      origin_sector: selectedOriginSector,
-      destination_district: selectedDestDistrict,
-      destination_sector: selectedDestSector,
-    });
-
-    // Validate location selections
-    if (
-      !selectedOriginDistrict ||
-      !selectedOriginSector ||
-      !selectedDestDistrict ||
-      !selectedDestSector
-    ) {
-      setMessage(
-        "Please select both origin and destination locations completely"
-      );
-      setMessageType("error");
-      return;
-    }
-
-    // Find coordinates for start and end sectors
-    const startCoords = findSectorCoordinates(
-      selectedOriginDistrict,
-      selectedOriginSector
-    );
-
-    const endCoords = findSectorCoordinates(
-      selectedDestDistrict,
-      selectedDestSector
-    );
-
-    if (!startCoords || !endCoords) {
-      setMessage("Invalid location selection. Please select valid locations.");
-      setMessageType("error");
-      return;
-    }
-
-    try {
-      const relocationData = {
-        start_point: selectedOriginSector,
-        end_point: selectedDestSector,
-        start_latitude: startCoords.latitude,
-        start_longitude: startCoords.longitude,
-        end_latitude: endCoords.latitude,
-        end_longitude: endCoords.longitude,
-        relocation_size: e.target.vehicle.value, // Vehicle ID
-        driver_id: e.target.driver.value, // Driver ID
-        move_datetime: e.target.move_datetime.value,
-        status: e.target.status.value,
-
-        // Explicitly set location fields
-        origin_sector: selectedOriginSector,
-        origin_district: selectedOriginDistrict,
-        destination_sector: selectedDestSector,
-        destination_district: selectedDestDistrict,
-
-        // Add the cost fields
-        base_cost: e.target.base_cost.value || 0,
-        adjusted_cost: e.target.adjusted_cost.value || 0,
-      };
-
-      console.log("Sending relocation data:", relocationData);
-
-      if (currentRelocation) {
-        // Update existing relocation
-        await axios.put(
-          `${BASE_URL}update/${currentRelocation.id}/`,
-          relocationData,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        setMessage("Relocation updated successfully");
-      } else {
-        // Create new relocation
-        await axios.post(`${BASE_URL}create/`, relocationData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        setMessage("Relocation created successfully");
-      }
-
-      handleFetch();
-      setIsModalOpen(false);
-      setCurrentRelocation(null);
-      setMessageType("success");
-    } catch (err) {
-      console.error("Error submitting form:", err);
-      setMessage(err.response?.data.error || "An error occurred");
-      setMessageType("error");
-    }
-  };
-
   // Add this function after the handleAddUpdateRelocation function
   // This will create summary stat cards to display at the top of the page
 
@@ -1090,6 +987,110 @@ function Admin_Manage_Relocations() {
     currentPage * relocationsPerPage
   );
 
+  const handleAddUpdateRelocation = async (e) => {
+    e.preventDefault();
+
+    // Log the form data being submitted for debugging
+    console.log("Submitting form with locations:", {
+      origin_district: selectedOriginDistrict,
+      origin_sector: selectedOriginSector,
+      destination_district: selectedDestDistrict,
+      destination_sector: selectedDestSector,
+    });
+
+    // Validate location selections
+    if (
+      !selectedOriginDistrict ||
+      !selectedOriginSector ||
+      !selectedDestDistrict ||
+      !selectedDestSector
+    ) {
+      setMessage(
+        "Please select both origin and destination locations completely"
+      );
+      setMessageType("error");
+      return;
+    }
+
+    // Find coordinates for start and end sectors
+    const startCoords = findSectorCoordinates(
+      selectedOriginDistrict,
+      selectedOriginSector
+    );
+
+    const endCoords = findSectorCoordinates(
+      selectedDestDistrict,
+      selectedDestSector
+    );
+
+    if (!startCoords || !endCoords) {
+      setMessage("Invalid location selection. Please select valid locations.");
+      setMessageType("error");
+      return;
+    }
+
+    try {
+      const relocationData = {
+        start_point: selectedOriginSector,
+        end_point: selectedDestSector,
+        start_latitude: startCoords.latitude,
+        start_longitude: startCoords.longitude,
+        end_latitude: endCoords.latitude,
+        end_longitude: endCoords.longitude,
+        relocation_size: e.target.vehicle.value, // Vehicle ID
+        driver_id: e.target.driver.value, // Driver ID
+        move_datetime: e.target.move_datetime.value,
+        status: e.target.status.value,
+        is_paid: e.target.is_paid.value,
+
+        // Explicitly set location fields
+        origin_sector: selectedOriginSector,
+        origin_district: selectedOriginDistrict,
+        destination_sector: selectedDestSector,
+        destination_district: selectedDestDistrict,
+
+        // Add the cost fields
+        base_cost: e.target.base_cost.value || 0,
+        adjusted_cost: e.target.adjusted_cost.value || 0,
+      };
+
+      console.log("Sending relocation data:", relocationData);
+
+      if (currentRelocation) {
+        // Update existing relocation
+        await axios.put(
+          `${BASE_URL}update/${currentRelocation.id}/`,
+          relocationData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        setMessage("Relocation updated successfully");
+      } else {
+        // Create new relocation
+        await axios.post(`${BASE_URL}create/`, relocationData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        setMessage("Relocation created successfully");
+      }
+
+      handleFetch();
+      setIsModalOpen(false);
+      setCurrentRelocation(null);
+      setMessageType("success");
+    } catch (err) {
+      console.error("Error submitting form:", err);
+      setMessage(err.response?.data.error || "An error occurred");
+      setMessageType("error");
+    }
+  };
+
   const renderModal = () => {
     return (
       <div
@@ -1463,6 +1464,42 @@ function Admin_Manage_Relocations() {
                   </div>
                 </div>
               </div>
+
+              {/* Payment Status Dropdown - Add this new section */}
+              <div>
+                <label className="block text-gray-300 mb-2">
+                  Payment Status
+                </label>
+                <select
+                  name="is_paid"
+                  value={currentRelocation?.is_paid ? "true" : "false"}
+                  onChange={(e) => {
+                    if (currentRelocation) {
+                      setCurrentRelocation({
+                        ...currentRelocation,
+                        is_paid: e.target.value === "true",
+                      });
+                    }
+                  }}
+                  className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-gray-300"
+                >
+                  <option value="false">Not Paid</option>
+                  <option value="true">Paid</option>
+                </select>
+
+                {/* Optional: Visual indicator */}
+                <div className="mt-1 text-xs">
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                      currentRelocation?.is_paid
+                        ? "bg-green-900 text-green-300"
+                        : "bg-red-900 text-red-300"
+                    }`}
+                  >
+                    {currentRelocation?.is_paid ? "✓ Paid" : "✗ Not Paid"}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2 mt-6">
@@ -1603,6 +1640,8 @@ function Admin_Manage_Relocations() {
                         <th className="px-6 py-3">Status</th>
                         <th className="px-6 py-3">Move Date</th>
                         <th className="px-6 py-3">Cost</th>
+                        <th className="px-6 py-3">Paid By</th>
+                        <th className="px-6 py-3">Payment Status</th>
                         <th className="px-6 py-3 rounded-tr-lg">Actions</th>
                       </tr>
                     </thead>
@@ -1693,6 +1732,14 @@ function Admin_Manage_Relocations() {
                                   </p>
                                 </div>
                               </div>
+                            </td>
+
+                            <td className="px-4 py-2">
+                              {relocation.phone_number || "N/A"}
+                            </td>
+
+                            <td className="px-4 py-2">
+                              {relocation.is_paid ? "Paid" : "Unpaid"}
                             </td>
 
                             <td className="px-6 py-4">

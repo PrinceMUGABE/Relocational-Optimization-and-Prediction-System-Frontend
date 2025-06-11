@@ -48,6 +48,12 @@ import Driver_Manage_Feedbacks from "./components/pages/driver/manage_feedbacks.
 import DriverProfile from "./components/pages/driver/UserProfile.jsx";
 import Driver_Manage_Relocations from "./components/pages/driver/my_relocations.jsx";
 import Admin_Manage_Man_Powers from "./components/pages/admin/manage_manPowers.jsx";
+import Man_Power_Layout from "./components/man_power/Layout.jsx";
+import Man_Power_Home from "./components/pages/man_power/Home.jsx";
+import Man_Power_Manage_Relocations from "./components/pages/man_power/my_relocations.jsx";
+import Man_Power_Profile from "./components/pages/man_power/UserProfile.jsx";
+import Man_Power_Manage_Feedbacks from "./components/pages/man_power/manage_feedbacks.jsx";
+import Man_Power_VehiclesDisplay from "./components/pages/man_power/vehicles.jsx";
 
 
 
@@ -94,6 +100,7 @@ const App = () => {
 
             <Route path="/admin/drivers" element={<Admin_Manage_Drivers />} />
             <Route path="/admin/man_powers" element={<Admin_Manage_Man_Powers />} />
+            <Route path="/admin/man_powers" element={<Admin_Manage_Man_Powers />} />
             <Route path="/admin/feedbacks" element={<Admin_Manage_Feedbacks />} />
             <Route path="/admin/forecasts" element={<Admin_DemandForecast />} />
             <Route path="/admin/profile/:id" element={<AdminProfile />} />
@@ -126,6 +133,19 @@ const App = () => {
             <Route path="/driver/profile" element={<DriverProfile />} />
 
             <Route path="/driver/relocations" element={<Driver_Manage_Relocations />} />
+     
+          </Route>
+
+
+          <Route path="/man_power" element={<Man_Power_Layout />}>
+            <Route index element={<Man_Power_Home />} />
+            <Route path="/man_power/vehicles" element={<Man_Power_VehiclesDisplay />} />
+            <Route path="/man_power/predict" element={<Driver_Map />} />
+            <Route path="/man_power/feedbacks" element={<Man_Power_Manage_Feedbacks />} />
+
+            <Route path="/man_power/profile" element={<Man_Power_Profile />} />
+
+            <Route path="/man_power/relocations" element={<Man_Power_Manage_Relocations />} />
      
           </Route>
 

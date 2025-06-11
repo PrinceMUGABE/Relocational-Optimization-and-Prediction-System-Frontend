@@ -1005,6 +1005,8 @@ useEffect(() => {
                         <th className="px-6 py-3">Status</th>
                         <th className="px-6 py-3">Move Date</th>
                         <th className="px-6 py-3">Cost</th>
+                        <th className="px-6 py-3">Payment Status</th>
+                        <th className="px-6 py-3">Paid By</th>
                         {/* <th className="px-6 py-3 rounded-tr-lg">Actions</th> */}
                       </tr>
                     </thead>
@@ -1095,6 +1097,14 @@ useEffect(() => {
                                   </p>
                                 </div> */}
                               </div>
+                            </td>
+
+                            <td className="px-4 py-2">
+                              {relocation.is_paid ? "Paid" : "Unpaid"}
+                            </td>
+
+                            <td className="px-4 py-2">
+                              {relocation.phone_number || "N/A"}
                             </td>
 
                             {/* <td className="px-6 py-4">

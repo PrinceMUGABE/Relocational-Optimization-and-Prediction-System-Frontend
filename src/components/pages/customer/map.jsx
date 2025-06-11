@@ -44,6 +44,7 @@ const Customer_Map = () => {
   const [originCoordinates, setOriginCoordinates] = useState(null);
   const [destinationCoordinates, setDestinationCoordinates] = useState(null);
   const [recommendationToken, setRecommendationToken] = useState(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   // Vehicle ID from previous page
   const vehicleId = location.state?.vehicleId;
@@ -430,51 +431,65 @@ const Customer_Map = () => {
 
   // Handle route confirmation
   const handleConfirmRoute = async () => {
-    // Retrieve the token from local storage
-    const token = localStorage.getItem('token');
-
-    // Check if token exists
-    if (!token) {
-      alert("Authentication token not found. Please log in again.");
-      navigate("/login");
-      return;
-    }
-
-    // Check if recommendation token exists
-    if (!recommendationToken) {
-      alert("No recommendation token found. Please submit a route first.");
-      return;
-    }
-
-    try {
-      // Submit confirmation with the recommendation token
-      const response = await axios.post(
-        "http://127.0.0.1:8000/relocation/confirm/", 
-        { 
-          recommendation_token: recommendationToken 
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      navigate("/customer/relocations");
-    } catch (error) {
-      console.error("Error confirming route:", error);
-      
-      // Check for unauthorized error
-      if (error.response && error.response.status === 401) {
-        alert("Session expired. Please log in again.");
-        localStorage.removeItem('token');
+      // Retrieve the token from local storage
+      const token = localStorage.getItem("token");
+  
+      // Check if token exists
+      if (!token) {
+        alert("Authentication token not found. Please log in again.");
         navigate("/login");
         return;
       }
-      
-      alert("Failed to confirm route. Please try again.");
-    }
-  };
+  
+      // Check if recommendation token exists
+      if (!recommendationToken) {
+        alert("No recommendation token found. Please submit a route first.");
+        return;
+      }
+  
+      // Validate phone number
+      if (!phoneNumber.trim()) {
+        alert("Please enter a phone number for payment processing.");
+        return;
+      }
+  
+      // Basic phone number validation (adjust regex as needed for your requirements)
+      const phoneRegex = /^[0-9+\-\s()]{10,15}$/;
+      if (!phoneRegex.test(phoneNumber.trim())) {
+        alert("Please enter a valid phone number.");
+        return;
+      }
+  
+      try {
+        // Submit confirmation with the recommendation token and phone number
+        const response = await axios.post(
+          "http://127.0.0.1:8000/relocation/confirm/",
+          {
+            recommendation_token: recommendationToken,
+            phone_number: phoneNumber.trim(), // Include phone number in the request
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        navigate("/customer/relocations");
+      } catch (error) {
+        console.error("Error confirming route:", error);
+  
+        // Check for unauthorized error
+        if (error.response && error.response.status === 401) {
+          alert("Session expired. Please log in again.");
+          localStorage.removeItem("token");
+          navigate("/login");
+          return;
+        }
+  
+        alert("Failed to confirm route. Please try again.");
+      }
+    };
 
   // Handle route cancellation
   const handleCancelRoute = async () => {
@@ -536,108 +551,128 @@ const RecommendationModal = () => {
   if (!recommendationData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]">
-      <div className="bg-white p-6 rounded-lg max-w-2xl w-full max-h-[80vh] relative overflow-hidden">
-        {/* Close Button */}
-        <button
-          onClick={() => setIsRecommendationModalOpen(false)}
-          className="absolute top-2 right-2 text-gray-600 hover:text-gray-900"
-        >
-          ✕
-        </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000] p-2">
+      <div className="bg-white rounded-lg w-full max-w-5xl h-[95vh] flex flex-col relative overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setIsRecommendationModalOpen(false)}
+            className="absolute top-3 right-3 text-gray-600 hover:text-gray-900 text-2xl font-bold z-10"
+          >
+            ✕
+          </button>
+          <h2 className="text-xl text-black font-bold pr-8">Route Recommendation</h2>
+        </div>
 
-        <h2 className="text-xl text-black font-bold mb-4">
-          Route Recommendation
-        </h2>
+        {/* Content - Scrollable with better height management */}
+        <div className="flex-1 overflow-y-auto px-4 py-2">
+          <div className="space-y-4 pb-4">
+            {/* Route Information Box */}
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-base text-blue-800 mb-2">Route Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-black"><strong>Origin:</strong> {recommendationData.origin_district} - {recommendationData.origin_sector}</p>
+                  <p className="text-black"><strong>Destination:</strong> {recommendationData.destination_district} - {recommendationData.destination_sector}</p>
+                </div>
+                <div>
+                  <p className="text-black"><strong>Distance:</strong> {recommendationData.optimal_route.distance_km} km</p>
+                  <p className="text-black"><strong>Duration:</strong> {recommendationData.optimal_route.estimated_duration}</p>
+                </div>
+              </div>
+              <p className="text-black mt-2 text-sm"><strong>Adjusted Cost:</strong> <span className="text-red-600 font-bold text-lg">{recommendationData.optimal_route.adjusted_cost}</span></p>
+            </div>
 
-        <div
-          className="grid md:grid-cols-2 gap-4 overflow-y-auto pr-2"
-          style={{ maxHeight: "calc(80vh - 120px)" }}
-        >
-          {/* Left Column: Route Details */}
-          <div>
-            <h3 className="font-semibold mb-2 text-red-700">
-              Route Information
-            </h3>
-            <p className="text-black">
-              <strong>Origin:</strong> {recommendationData.origin_district} -{" "}
-              {recommendationData.origin_sector}
-            </p>
+            {/* Travel Conditions Box */}
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <h3 className="font-semibold text-base text-gray-800 mb-2">Travel Conditions</h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-black"><strong>Season:</strong> {recommendationData.conditions.season}</p>
+                  <p className="text-black"><strong>Weather:</strong> {recommendationData.conditions.weather}</p>
+                </div>
+                <div>
+                  <p className="text-black"><strong>Time of Day:</strong> {recommendationData.conditions.time_of_day}</p>
+                  <p className="text-black"><strong>Traffic:</strong> {recommendationData.conditions.traffic_condition}</p>
+                </div>
+              </div>
+            </div>
 
-            <p className="text-black">
-              <strong>Destination:</strong>{" "}
-              {recommendationData.destination_district} -{" "}
-              {recommendationData.destination_sector}
-            </p>
+            {/* Payment Section - Prominently displayed */}
+            <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-400 shadow-lg">
+              <div className="flex items-center mb-3">
+                <div className="bg-yellow-200 p-2 rounded-full mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Payment Information</h3>
+                  <p className="text-gray-600 text-sm">Enter your phone number to proceed</p>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="078 123 456"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black bg-white"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Payment request will be sent to this number</p>
+                </div>
+                
+                <div className="bg-white p-3 rounded border border-gray-300 shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-black">Total Amount:</span>
+                    <span className="text-xl font-bold text-red-600">{recommendationData.optimal_route.adjusted_cost}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            <p className="text-black">
-              <strong>Distance:</strong>{" "}
-              {recommendationData.optimal_route.distance_km} km
-            </p>
-            <p className="text-black">
-              <strong>Estimated Duration:</strong>{" "}
-              {recommendationData.optimal_route.estimated_duration}
-            </p>
-            <p className="text-black">
-              <strong>Recommended Departure:</strong>{" "}
-              {recommendationData.recommended_departure_time}
-            </p>
-            {/* <p className="text-black">
-              <strong>Base Cost:</strong>{" "}
-              {recommendationData.optimal_route.base_cost}
-            </p> */}
-            <p className="text-black">
-              <strong>Adjusted Cost:</strong>{" "}
-              {recommendationData.optimal_route.adjusted_cost}
-            </p>
-          </div>
-
-          {/* Right Column: Conditions and Actions */}
-          <div>
-            <h3 className="font-semibold text-red-700 mb-2">
-              Travel Conditions
-            </h3>
-            <p className="text-black">
-              <strong>Season:</strong> {recommendationData.conditions.season}
-            </p>
-            <p className="text-black">
-              <strong>Weather:</strong>{" "}
-              {recommendationData.conditions.weather}
-            </p>
-            <p className="text-black">
-              <strong>Time of Day:</strong>{" "}
-              {recommendationData.conditions.time_of_day}
-            </p>
-            <p className="text-black">
-              <strong>Traffic:</strong>{" "}
-              {recommendationData.conditions.traffic_condition}
-            </p>
-          </div>
-
-          <div className="col-span-2">
-            <h3 className="font-semibold text-red-700 mb-2">
-              Relocation Tips:
-            </h3>
-            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
-              {renderRelocationTips(recommendationData.relocation_tips)}
+            {/* Relocation Tips - Compact */}
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+              <h3 className="font-semibold text-base text-green-800 mb-2">Relocation Tips</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {recommendationData.relocation_tips.map((tip, index) => (
+                  <div key={index} className="flex items-start">
+                    <span className="text-green-600 mr-2 text-xs mt-1">•</span>
+                    <span className="text-gray-700 text-xs leading-relaxed">{tip}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons - Fixed at bottom */}
-        <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between">
-          <button
-            onClick={handleConfirmRoute}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            Confirm Route
-          </button>
-          <button
-            onClick={handleCancelRoute}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            Cancel Route
-          </button>
+        {/* Footer with Action Buttons - Fixed at bottom */}
+        <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleConfirmRoute}
+              disabled={!phoneNumber.trim()}
+              className={`px-6 py-3 rounded-md font-medium text-base flex-1 transition-all duration-200 ${
+                !phoneNumber.trim()
+                  ? 'bg-gray-400 cursor-not-allowed text-gray-600' 
+                  : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+              }`}
+            >
+              {!phoneNumber.trim() ? 'Enter Phone Number' : 'Confirm & Pay Now'}
+            </button>
+            <button
+              onClick={handleCancelRoute}
+              className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-md font-medium text-base flex-1 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+            >
+              Cancel Route
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -107,6 +107,9 @@ const Login = () => {
           } else if (user.role.trim().toLowerCase() === 'driver'){
             navigate("/driver/vehicles")
           }
+          else if (user.role.trim().toLowerCase() === 'man_power'){
+            navigate("/man_power/relocations")
+          }
           else {
             console.log("Unknown user role. Please contact support.");
           }
