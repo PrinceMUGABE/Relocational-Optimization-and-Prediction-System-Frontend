@@ -333,6 +333,7 @@ function Admin_Manage_Relocations() {
       setMessageType("success");
       setCurrentPage(1);
     } catch (err) {
+      console.error("Error deleting relocation:", err);
       setMessage(err.response?.data.message || "An error occurred");
       setMessageType("error");
     }

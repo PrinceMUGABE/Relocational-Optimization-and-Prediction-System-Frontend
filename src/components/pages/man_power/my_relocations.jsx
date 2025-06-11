@@ -96,7 +96,7 @@ function Man_Power_Manage_Relocations() {
 
   const handleFetch = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}get-driver/`, {
+      const res = await axios.get(`${BASE_URL}get-man-power/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log("Fetched Data: ", res.data);
@@ -537,7 +537,7 @@ function Man_Power_Manage_Relocations() {
                         <th className="px-6 py-3">Size</th>
                         <th className="px-6 py-3">Status</th>
                         <th className="px-6 py-3">Move Date</th>
-                        <th className="px-6 py-3 rounded-tr-lg">Actions</th>
+                        <th className="px-6 py-3 rounded-tr-lg">Driver</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -613,6 +613,25 @@ function Man_Power_Manage_Relocations() {
                             </td>
 
                             <td className="px-6 py-4">
+                              {relocation.driver ? (
+                                <div className="flex items-center space-x-2">
+                                  {/* <img
+                                    src={relocation.driver.user?.profile_picture || relocation.driver.profile_picture}
+                                    alt="Driver"
+                                    className="w-8 h-8 rounded-full"
+                                  /> */}
+                                  <span className="text-gray-300">
+                                    {relocation.driver.user?.phone_number ||
+                                      relocation.driver.first_name}{" "}
+                                   
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-500">No driver assigned</span>
+                              )}
+                            </td>
+
+                            {/* <td className="px-6 py-4">
                               <button
                                 onClick={() => openStatusModal(relocation)}
                                 className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition flex items-center"
@@ -620,7 +639,7 @@ function Man_Power_Manage_Relocations() {
                                 <FontAwesomeIcon icon={faEdit} className="mr-1" />
                                 Update Status
                               </button>
-                            </td>
+                            </td> */}
                           </tr>
                         ))
                       )}

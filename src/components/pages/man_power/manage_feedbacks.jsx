@@ -102,7 +102,7 @@ function Man_Power_Manage_Feedbacks() {
 
   const COLORS = ["#FF6B6B", "#4ECDC4", "#FFD166", "#F9F871", "#A58FE3"];
   const BASE_URL = "http://127.0.0.1:8000/feedback/";
-  const RELOCATIONS_URL = "http://127.0.0.1:8000/relocation/get-driver/";
+  const RELOCATIONS_URL = "http://127.0.0.1:8000/relocation/get-man-power/";
   const token = localStorage.getItem("token");
 
   useEffect(() => {

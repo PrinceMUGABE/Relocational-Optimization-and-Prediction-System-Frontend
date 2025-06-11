@@ -84,6 +84,7 @@ function Admin_Manage_Vehicles() {
   const COLORS = ["#FF6B6B", "#4ECDC4", "#FFD166", "#F9F871"];
   const BASE_URL = "http://127.0.0.1:8000/vehicle/";
   const token = localStorage.getItem("token");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -178,58 +179,92 @@ function Admin_Manage_Vehicles() {
   };
 
   const handleAddUpdateVehicle = async (e) => {
-    e.preventDefault();
-    try {
-      const vehicleData = {
-        type: e.target.type.value,
-        total_weight_to_carry: e.target.total_weight.value,
-        relocation_size: e.target.relocation_size.value, // Add this line
-        vehicle_model: e.target.vehicle_model.value, // Add this line
-        plate_number: e.target.plate_number.value, // Add this line
-        driving_category: e.target.driving_category.value,
-        totl_man_power: e.target.total_man_power.value,
-      };
+  e.preventDefault();
+  try {
+    const vehicleData = {
+      type: e.target.type.value,
+      total_weight_to_carry: e.target.total_weight.value,
+      relocation_size: e.target.relocation_size.value,
+      vehicle_model: e.target.vehicle_model.value,
+      plate_number: e.target.plate_number.value,
+      driving_category: e.target.driving_category.value,
+      total_man_power: e.target.total_man_power.value,
+    };
 
-      // Add image base64 if selected or existing
-      if (selectedImage) {
-        vehicleData.image_base64 = selectedImage;
-      }
+    // Add image base64 if selected or existing
+    if (selectedImage) {
+      vehicleData.image_base64 = selectedImage;
+    }
 
-      if (currentVehicle) {
-        // Update existing vehicle
-        await axios.put(
-          `${BASE_URL}update_vehicle/${currentVehicle.id}/`,
-          vehicleData,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        setMessage("Vehicle updated successfully");
-      } else {
-        // Create new vehicle
-        await axios.post(`${BASE_URL}create_vehicle/`, vehicleData, {
+    if (currentVehicle) {
+      // Update existing vehicle
+      console.log("Updating vehicle with data:", vehicleData);
+      
+      const response = await axios.put(
+        `${BASE_URL}update_vehicle/${currentVehicle.id}/`,
+        vehicleData,
+        {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        });
-        setMessage("Vehicle created successfully");
-      }
-
-      handleFetch();
-      setIsModalOpen(false);
-      setCurrentVehicle(null);
-      setSelectedImage(null);
-      setImagePreview(null);
-      setMessageType("success");
-    } catch (err) {
-      setMessage(err.response?.data.error || "An error occurred");
-      setMessageType("error");
+        }
+      );
+      
+      console.log("Update response:", response.data);
+      setMessage("Vehicle updated successfully");
+    } else {
+      // Create new vehicle
+      const response = await axios.post(`${BASE_URL}create_vehicle/`, vehicleData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      console.log("Create response:", response.data);
+      setMessage("Vehicle created successfully");
     }
-  };
+
+    await handleFetch();
+    setIsModalOpen(false);
+    setCurrentVehicle(null);
+    setSelectedImage(null);
+    setImagePreview(null);
+    setMessageType("success");
+  } catch (err) {
+    console.error("Error in handleAddUpdateVehicle:", err);
+    
+    // More detailed error handling
+    if (err.response) {
+      // Server responded with error status
+      console.error("Response data:", err.response.data);
+      console.error("Response status:", err.response.status);
+      
+      if (err.response.status === 404) {
+        setMessage("Vehicle not found or endpoint not available. Please check the vehicle ID and try again.");
+      } else if (err.response.status === 401) {
+        setMessage("Unauthorized. Please log in again.");
+        // Optionally redirect to login
+        // navigate("/login");
+      } else if (err.response.status === 403) {
+        setMessage("You don't have permission to perform this action.");
+      } else {
+        setMessage(err.response?.data?.error || err.response?.data?.message || "An error occurred while updating the vehicle");
+      }
+    } else if (err.request) {
+      // Request made but no response received
+      console.error("No response received:", err.request);
+      setMessage("Network error. Please check your connection and try again.");
+    } else {
+      // Something else happened
+      console.error("Error message:", err.message);
+      setMessage("An unexpected error occurred. Please try again.");
+    }
+    
+    setMessageType("error");
+  }
+};
 
   // Modify modal opening to reset image states
   const openModal = (vehicle = null) => {
@@ -1082,7 +1117,7 @@ function Admin_Manage_Vehicles() {
                               {vehicle.total_weight_to_carry} kg
                             </td>
                             <td className="px-6 py-4 text-gray-300">
-                              {vehicle.total_man_power} kg
+                              {vehicle.total_man_power}
                             </td>
                             <td className="px-6 py-4 text-gray-300">
                               {new Date(

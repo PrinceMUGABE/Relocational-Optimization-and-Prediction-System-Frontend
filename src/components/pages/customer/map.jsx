@@ -489,7 +489,7 @@ const Customer_Map = () => {
   
         alert("Failed to confirm route. Please try again.");
       }
-    };
+  };
 
   // Handle route cancellation
   const handleCancelRoute = async () => {
