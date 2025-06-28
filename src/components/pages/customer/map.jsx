@@ -16,6 +16,13 @@ const createCustomIcon = (color) => {
   });
 };
 
+const getMinDateTime = () => {
+  const now = new Date();
+  // Add 1 hour buffer to current time
+  now.setHours(now.getHours() + 1);
+  return now.toISOString().slice(0, 16);
+};
+
 const Customer_Map = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -719,190 +726,221 @@ const renderRelocationTips = (tips) => {
 
   return (
     <div className="container mx-auto p-4">
-      <form onSubmit={handleSubmit} className="mb-4 grid grid-cols-2 gap-4">
-        {/* Origin District Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Origin District
-          </label>
-          <select
-            value={selectedOriginDistrict}
-            onChange={(e) => {
-              setSelectedOriginDistrict(e.target.value);
-              // Reset origin sector when district changes
-              setSelectedOriginSector("");
-            }}
-            className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+      
+<form onSubmit={handleSubmit} className="mb-6 bg-white p-6 rounded-lg shadow-sm">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {/* Origin District Dropdown */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Origin District
+      </label>
+      <select
+        value={selectedOriginDistrict}
+        onChange={(e) => {
+          setSelectedOriginDistrict(e.target.value);
+          setSelectedOriginSector("");
+        }}
+        className="w-full text-black px-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        required
+      >
+        <option value="">Select Origin District</option>
+        {allDistricts.map((district) => (
+          <option
+            key={`${district.name}-${district.provinceName}`}
+            value={district.name}
           >
-            <option value="">Select Origin District</option>
-            {allDistricts.map((district) => (
-              <option
-                key={`${district.name}-${district.provinceName}`}
-                value={district.name}
-              >
-                {district.name} ({district.provinceName})
-              </option>
-            ))}
-          </select>
-        </div>
+            {district.name} ({district.provinceName})
+          </option>
+        ))}
+      </select>
+    </div>
 
-        {/* Destination District Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Destination District
-          </label>
-          <select
-            value={selectedDestinationDistrict}
-            onChange={(e) => {
-              setSelectedDestinationDistrict(e.target.value);
-              // Reset destination sector when district changes
-              setSelectedDestinationSector("");
-            }}
-            className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+    {/* Origin Sector Dropdown */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Origin Sector
+      </label>
+      <select
+        value={selectedOriginSector}
+        onChange={(e) => handleOriginSectorChange(e.target.value)}
+        disabled={!selectedOriginDistrict}
+        className="w-full text-black px-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+        required
+      >
+        <option value="">Select Origin Sector</option>
+        {allSectors.map((sector) => (
+          <option
+            key={`${sector.name}-${sector.districtName}`}
+            value={sector.name}
           >
-            <option value="">Select Destination District</option>
-            {allDistricts.map((district) => (
-              <option
-                key={`${district.name}-${district.provinceName}`}
-                value={district.name}
-              >
-                {district.name} ({district.provinceName})
-              </option>
-            ))}
-          </select>
-        </div>
+            {sector.name}
+          </option>
+        ))}
+      </select>
+    </div>
 
-        {/* Origin Sector Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Origin Sector
-          </label>
-          <select
-            value={selectedOriginSector}
-            onChange={(e) => handleOriginSectorChange(e.target.value)}
-            disabled={!selectedOriginDistrict}
-            className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+    {/* Move Date and Time - MODIFIED to disable past dates */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Move Date and Time
+      </label>
+      <input
+        type="datetime-local"
+        value={moveDateTime}
+        onChange={(e) => setMoveDateTime(e.target.value)}
+        min={getMinDateTime()}
+        className="w-full text-gray-600 px-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        required
+      />
+    </div>
+
+    {/* Destination District Dropdown */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Destination District
+      </label>
+      <select
+        value={selectedDestinationDistrict}
+        onChange={(e) => {
+          setSelectedDestinationDistrict(e.target.value);
+          setSelectedDestinationSector("");
+        }}
+        className="w-full text-black px-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        required
+      >
+        <option value="">Select Destination District</option>
+        {allDistricts.map((district) => (
+          <option
+            key={`${district.name}-${district.provinceName}`}
+            value={district.name}
           >
-            <option value="">Select Origin Sector</option>
-            {allSectors.map((sector) => (
+            {district.name} ({district.provinceName})
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Destination Sector Dropdown */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Destination Sector
+      </label>
+      <select
+        value={selectedDestinationSector}
+        onChange={(e) => handleDestinationSectorChange(e.target.value)}
+        disabled={!selectedDestinationDistrict}
+        className="w-full text-black px-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+        required
+      >
+        <option value="">Select Destination Sector</option>
+        {selectedDestinationDistrict
+          ? getSectorsForDistrict(selectedDestinationDistrict).map(
+            (sector) => (
               <option
                 key={`${sector.name}-${sector.districtName}`}
                 value={sector.name}
               >
-                {sector.name} (District: {sector.districtName})
+                {sector.name}
               </option>
-            ))}
-          </select>
-        </div>
+            )
+          )
+          : []}
+      </select>
+    </div>
 
-        {/* Destination Sector Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Destination Sector
-          </label>
-          <select
-            value={selectedDestinationSector}
-            onChange={(e) => handleDestinationSectorChange(e.target.value)}
-            disabled={!selectedDestinationDistrict}
-            className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-          >
-            <option value="">Select Destination Sector</option>
-            {selectedDestinationDistrict
-              ? getSectorsForDistrict(selectedDestinationDistrict).map(
-                (sector) => (
-                  <option
-                    key={`${sector.name}-${sector.districtName}`}
-                    value={sector.name}
-                  >
-                    {sector.name} (District: {sector.districtName})
-                  </option>
-                )
-              )
-              : []}
-          </select>
-        </div>
+    {/* Submit Button */}
+    <div className="flex items-end">
+      <button
+        type="submit"
+        className="w-full px-4 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      >
+        Get Route Recommendation
+      </button>
+    </div>
+  </div>
+</form>
 
-        {/* Date and Time Picker */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Move Date and Time
-          </label>
-          <input
-            type="datetime-local"
-            value={moveDateTime}
-            onChange={(e) => setMoveDateTime(e.target.value)}
-            className="mt-1 text-gray-600 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-          />
-        </div>
+{/* <div className="col-span-2 grid grid-cols-2 gap-4">
+  <div>
+    <label className="block text-sm font-medium text-gray-700">
+      Origin Coordinates
+    </label>
+    <input
+      type="text"
+      value={
+        originCoordinates
+          ? `Lat: ${originCoordinates.lat.toFixed(
+            6
+          )}, Lng: ${originCoordinates.lng.toFixed(6)}`
+          : "Not Selected"
+      }
+      readOnly
+      className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 rounded-md"
+    />
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700">
+      Destination Coordinates
+    </label>
+    <input
+      type="text"
+      value={
+        destinationCoordinates
+          ? `Lat: ${destinationCoordinates.lat.toFixed(
+            6
+          )}, Lng: ${destinationCoordinates.lng.toFixed(6)}`
+          : "Not Selected"
+      }
+      readOnly
+      className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 rounded-md"
+    />
+  </div>
+</div> */}
 
-        {/* Coordinates Display */}
-        <div className="col-span-2 grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Origin Coordinates
-            </label>
-            <input
-              type="text"
-              value={
-                originCoordinates
-                  ? `Lat: ${originCoordinates.lat.toFixed(
-                    6
-                  )}, Lng: ${originCoordinates.lng.toFixed(6)}`
-                  : "Not Selected"
-              }
-              readOnly
-              className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Destination Coordinates
-            </label>
-            <input
-              type="text"
-              value={
-                destinationCoordinates
-                  ? `Lat: ${destinationCoordinates.lat.toFixed(
-                    6
-                  )}, Lng: ${destinationCoordinates.lng.toFixed(6)}`
-                  : "Not Selected"
-              }
-              readOnly
-              className="mt-1 text-black block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 rounded-md"
-            />
-          </div>
-        </div>
-      </form>
+<div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+  <h3 className="text-sm font-semibold text-blue-800 mb-2">Instructions</h3>
+  <p className="text-sm text-blue-700">
+    Select districts and sectors from the dropdowns above, or click directly on the map to choose your origin (green) and destination (red) points. Click again to reset markers if needed.
+  </p>
+  
+  {/* Status indicators without coordinates */}
+  <div className="flex items-center space-x-6 mt-3">
+    <div className="flex items-center">
+      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+      <span className="text-sm text-gray-700 font-medium">
+        Origin: {originCoordinates ? 'Selected' : 'Not selected'}
+      </span>
+    </div>
+    <div className="flex items-center">
+      <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+      <span className="text-sm text-gray-700 font-medium">
+        Destination: {destinationCoordinates ? 'Selected' : 'Not selected'}
+      </span>
+    </div>
+  </div>
+</div>
 
-      {/* Map Instructions */}
-      <div className="mb-4 text-sm text-gray-600">
-        Select a district and sector, or click on the map to select your origin
-        (green) and destination (red) points. Click again to reset markers if
-        needed.
-      </div>
 
-      {/* Map Controls */}
-      <div className="flex space-x-4 mb-4">
-        <button
-          onClick={resetMap}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Reset Map View
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-        >
-          Submit Route
-        </button>
-      </div>
+<div className="flex flex-wrap gap-3 mb-4">
+  <button
+    onClick={resetMap}
+    className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+  >
+    Reset Map View
+  </button>
+  <button
+    onClick={handleSubmit}
+    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+  >
+    Submit Route
+  </button>
+</div>
 
-      {/* Map Container */}
-      <div
-        ref={mapContainerRef}
-        style={{ height: "500px", width: "100%" }}
-        className="border-2 border-gray-300 rounded"
-      />
+<div
+  ref={mapContainerRef}
+  style={{ height: "500px", width: "100%" }}
+  className="border-2 border-gray-300 rounded-lg shadow-lg"
+/>
 
       {/* Recommendation Modal */}
       {isRecommendationModalOpen && <RecommendationModal />}

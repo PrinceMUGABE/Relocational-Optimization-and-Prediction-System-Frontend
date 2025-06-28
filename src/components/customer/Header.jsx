@@ -23,7 +23,7 @@ const Customer_Header = () => {
   // Retrieve user data from local storage
   const userData = JSON.parse(localStorage.getItem("userData")) || {};
   const userId = userData.id || "";
-  const userName = userData.name || "User";
+  const userName = userData.email || "User";
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("userData"));

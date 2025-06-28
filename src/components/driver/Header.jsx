@@ -23,7 +23,7 @@ const DriverHeader = () => {
   // Retrieve user data from local storage
   const userData = JSON.parse(localStorage.getItem("userData")) || {};
   const userId = userData.id || "";
-  const userName = userData.name || "User";
+  const userName = userData.email || "User";
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("userData"));
@@ -48,11 +48,11 @@ const DriverHeader = () => {
 
   const Navbar_Links = [
     // { id: 1, name: "Dashboard", path: "/customer", icon: <MdDashboard className="text-xl" /> },
-    { id: 1, name: "Vehicles", path: "/driver/vehicles", icon: <FaCar className="text-xl" /> },
-    { id: 2, name: "Relocations", path: "/driver/relocations", icon: <FaTruckMoving className="text-xl" /> },
+    // { id: 1, name: "Vehicles", path: "/driver/vehicles", icon: <FaCar className="text-xl" /> },
+    { id: 1, name: "Relocations", path: "/driver/relocations", icon: <FaTruckMoving className="text-xl" /> },
     // { id: 5, name: "Forecast", path: "/customer/forecasts", icon: <MdInsights className="text-xl" /> },
-    { id: 3, name: "Feedbacks", path: "/driver/feedbacks", icon: <FaComments className="text-xl" /> },
-    { id: 4, name: "Profile", path: `/driver/profile`, icon: <FaUserCircle className="text-xl" /> },
+    { id: 2, name: "Feedbacks", path: "/driver/feedbacks", icon: <FaComments className="text-xl" /> },
+    { id: 3, name: "Profile", path: `/driver/profile`, icon: <FaUserCircle className="text-xl" /> },
   ];
 
   // Check if a link is active

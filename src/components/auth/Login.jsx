@@ -105,7 +105,7 @@ const Login = () => {
           } else if (user.role.trim().toLowerCase() === "customer") {
             navigate("/customer/vehicles");
           } else if (user.role.trim().toLowerCase() === 'driver'){
-            navigate("/driver/vehicles")
+            navigate("/driver/relocations")
           }
           else if (user.role.trim().toLowerCase() === 'man_power'){
             navigate("/man_power/relocations")

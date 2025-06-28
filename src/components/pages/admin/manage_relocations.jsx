@@ -1744,24 +1744,26 @@ function Admin_Manage_Relocations() {
                             </td>
 
                             <td className="px-6 py-4">
-                              <div className="flex space-x-3">
-                                <button
-                                  onClick={() => {
-                                    setCurrentRelocation(relocation);
-                                    setIsModalOpen(true);
-                                  }}
-                                  className="text-blue-400 hover:text-blue-300 transition"
-                                >
-                                  <FontAwesomeIcon icon={faEdit} />
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(relocation.id)}
-                                  className="text-red-400 hover:text-red-300 transition"
-                                >
-                                  <FontAwesomeIcon icon={faTrash} />
-                                </button>
-                              </div>
-                            </td>
+  <div className="flex space-x-3">
+    {relocation.status !== "completed" && (
+      <button
+        onClick={() => {
+          setCurrentRelocation(relocation);
+          setIsModalOpen(true);
+        }}
+        className="text-blue-400 hover:text-blue-300 transition"
+      >
+        <FontAwesomeIcon icon={faEdit} />
+      </button>
+    )}
+    <button
+      onClick={() => handleDelete(relocation.id)}
+      className="text-red-400 hover:text-red-300 transition"
+    >
+      <FontAwesomeIcon icon={faTrash} />
+    </button>
+  </div>
+</td>
                           </tr>
                         ))
                       )}

@@ -155,7 +155,7 @@ function Driver_Manage_Relocations() {
   // New function for handling status updates only
   const handleStatusUpdate = async (e) => {
     e.preventDefault();
-  
+
     if (!currentRelocation || !newStatus) {
       setMessage("Invalid data. Please select a valid status.");
       setMessageType("error");
@@ -163,7 +163,7 @@ function Driver_Manage_Relocations() {
       setErrorModalOpen(true);
       return;
     }
-  
+
     try {
       const response = await axios.patch(
         `${BASE_URL}status-update/${currentRelocation.id}/`,
@@ -171,25 +171,26 @@ function Driver_Manage_Relocations() {
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
+            "Content-Type": "application/json",
+          },
         }
       );
-  
+
       setMessage(response.data.message || "Status updated successfully");
       setMessageType("success");
       handleFetch();
       closeStatusModal();
     } catch (err) {
       console.error("Error updating status:", err);
-      
-      const errorMsg = err.response?.data?.error || 
-                       err.response?.data?.message || 
-                       "Failed to update status";
-  
+
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to update status";
+
       setMessage(errorMsg);
       setMessageType("error");
-      
+
       // Set error message and open modal
       setErrorMessage(errorMsg);
       setErrorModalOpen(true);
@@ -353,7 +354,9 @@ function Driver_Manage_Relocations() {
             <div className="space-y-4">
               {/* Current Status Display */}
               <div className="mb-4">
-                <span className="block text-gray-400 mb-1">Current Status:</span>
+                <span className="block text-gray-400 mb-1">
+                  Current Status:
+                </span>
                 <span className="px-3 py-1 bg-gray-800 rounded-md text-white inline-block capitalize">
                   {currentRelocation?.status || "N/A"}
                 </span>
@@ -379,20 +382,33 @@ function Driver_Manage_Relocations() {
 
               {/* Relocation Details Summary */}
               <div className="mt-6 p-3 bg-gray-800 rounded-md border border-gray-700">
-                <h3 className="text-sm font-medium text-gray-400 mb-2">Relocation Details</h3>
+                <h3 className="text-sm font-medium text-gray-400 mb-2">
+                  Relocation Details
+                </h3>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div className="text-gray-400">Origin:</div>
-                  <div className="text-white">{currentRelocation?.origin_sector || "N/A"}</div>
-                  
+                  <div className="text-white">
+                    {currentRelocation?.origin_sector || "N/A"}
+                  </div>
+
                   <div className="text-gray-400">Destination:</div>
-                  <div className="text-white">{currentRelocation?.destination_sector || "N/A"}</div>
-                  
+                  <div className="text-white">
+                    {currentRelocation?.destination_sector || "N/A"}
+                  </div>
+
                   <div className="text-gray-400">Vehicle:</div>
-                  <div className="text-white">{currentRelocation?.vehicle?.plate_number || "N/A"}</div>
-                  
+                  <div className="text-white">
+                    {currentRelocation?.vehicle?.plate_number || "N/A"}
+                  </div>
+
                   <div className="text-gray-400">Move Date:</div>
-                  <div className="text-white">{currentRelocation?.move_datetime ? 
-                    new Date(currentRelocation.move_datetime).toLocaleString() : "N/A"}</div>
+                  <div className="text-white">
+                    {currentRelocation?.move_datetime
+                      ? new Date(
+                          currentRelocation.move_datetime
+                        ).toLocaleString()
+                      : "N/A"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -420,22 +436,22 @@ function Driver_Manage_Relocations() {
 
   const ErrorModal = ({ isOpen, onClose, message }) => {
     if (!isOpen) return null;
-  
+
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
         <div className="bg-white p-6 rounded-lg shadow-lg">
           <h2 className="text-red-600 font-bold text-lg">Error</h2>
           <p className="text-black">{message} !!!!!!</p>
-          <button 
-            onClick={onClose} 
-            className="mt-4 bg-red-500 text-white px-4 py-2 rounded">
+          <button
+            onClick={onClose}
+            className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
+          >
             Close
           </button>
         </div>
       </div>
     );
   };
-  
 
   return (
     <ErrorBoundary>
@@ -592,12 +608,17 @@ function Driver_Manage_Relocations() {
                               <p>{relocation.vehicle.plate_number}</p>
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase ${
-                                relocation.status === 'completed' ? 'bg-green-900 text-green-200' :
-                                relocation.status === 'canceled' ? 'bg-red-900 text-red-200' :
-                                relocation.status === 'in_progress' ? 'bg-blue-900 text-blue-200' :
-                                'bg-yellow-900 text-yellow-200'
-                              }`}>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium uppercase ${
+                                  relocation.status === "completed"
+                                    ? "bg-green-900 text-green-200"
+                                    : relocation.status === "canceled"
+                                    ? "bg-red-900 text-red-200"
+                                    : relocation.status === "in_progress"
+                                    ? "bg-blue-900 text-blue-200"
+                                    : "bg-yellow-900 text-yellow-200"
+                                }`}
+                              >
                                 {relocation.status}
                               </span>
                               {/* <p className="text-red-700 mt-1">Assigned driver:</p>
@@ -613,13 +634,18 @@ function Driver_Manage_Relocations() {
                             </td>
 
                             <td className="px-6 py-4">
-                              <button
-                                onClick={() => openStatusModal(relocation)}
-                                className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition flex items-center"
-                              >
-                                <FontAwesomeIcon icon={faEdit} className="mr-1" />
-                                Update Status
-                              </button>
+                              {relocation.status !== "completed" && (
+                                <button
+                                  onClick={() => openStatusModal(relocation)}
+                                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition flex items-center"
+                                >
+                                  <FontAwesomeIcon
+                                    icon={faEdit}
+                                    className="mr-1"
+                                  />
+                                  Update Status
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -677,16 +703,13 @@ function Driver_Manage_Relocations() {
         </div>
         {renderStatusModal()}
 
-        <ErrorModal 
-          isOpen={errorModalOpen} 
-          onClose={() => setErrorModalOpen(false)} 
-          message={errorMessage} 
+        <ErrorModal
+          isOpen={errorModalOpen}
+          onClose={() => setErrorModalOpen(false)}
+          message={errorMessage}
         />
       </div>
     </ErrorBoundary>
-
-
-
   );
 }
 
