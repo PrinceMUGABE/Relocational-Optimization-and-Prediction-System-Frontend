@@ -33,6 +33,7 @@ import {
 } from "recharts";
 
 import mapData from "../customer/mapData.json";
+import Logo from "../../../assets/pictures/logo.png";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -213,65 +214,71 @@ function Customer_Manage_Relocations() {
   // Fix for the openModal function
   // Fix for the openModal function - properly set location values
   // Fix for the openModal function
-const openModal = (relocation = null) => {
-  setIsModalOpen(true);
-  
-  if (relocation) {
-    // Set the current relocation first
-    setCurrentRelocation(relocation);
-    
-    // Then set location fields with a slight delay to ensure currentRelocation is set
-    setTimeout(() => {
-      // Set districts
-      setSelectedOriginDistrict(relocation.origin_district || "");
-      setSelectedDestDistrict(relocation.destination_district || "");
-      
-      // Set sectors after districts are set
-      setTimeout(() => {
-        setSelectedOriginSector(relocation.origin_sector || "");
-        setSelectedDestSector(relocation.destination_sector || "");
-      }, 50);
-    }, 50);
-  } else {
-    // Reset form for new relocation
-    setCurrentRelocation(null);
-    setSelectedOriginDistrict("");
-    setSelectedOriginSector("");
-    setSelectedDestDistrict("");
-    setSelectedDestSector("");
-  }
-};
+  const openModal = (relocation = null) => {
+    setIsModalOpen(true);
 
-useEffect(() => {
-  if (currentRelocation && isModalOpen) {
-    // Set location values from the current relocation
-    setSelectedOriginDistrict(currentRelocation.origin_district || "");
-    setSelectedDestDistrict(currentRelocation.destination_district || "");
-    
-    // Only set sectors if they exist and a district is selected
-    if (currentRelocation.origin_district && currentRelocation.origin_sector) {
-      const originSectors = getSectors(currentRelocation.origin_district);
-      const originSectorExists = originSectors.some(
-        sector => sector.name === currentRelocation.origin_sector
-      );
-      
-      if (originSectorExists) {
-        setSelectedOriginSector(currentRelocation.origin_sector);
+    if (relocation) {
+      // Set the current relocation first
+      setCurrentRelocation(relocation);
+
+      // Then set location fields with a slight delay to ensure currentRelocation is set
+      setTimeout(() => {
+        // Set districts
+        setSelectedOriginDistrict(relocation.origin_district || "");
+        setSelectedDestDistrict(relocation.destination_district || "");
+
+        // Set sectors after districts are set
+        setTimeout(() => {
+          setSelectedOriginSector(relocation.origin_sector || "");
+          setSelectedDestSector(relocation.destination_sector || "");
+        }, 50);
+      }, 50);
+    } else {
+      // Reset form for new relocation
+      setCurrentRelocation(null);
+      setSelectedOriginDistrict("");
+      setSelectedOriginSector("");
+      setSelectedDestDistrict("");
+      setSelectedDestSector("");
+    }
+  };
+
+  useEffect(() => {
+    if (currentRelocation && isModalOpen) {
+      // Set location values from the current relocation
+      setSelectedOriginDistrict(currentRelocation.origin_district || "");
+      setSelectedDestDistrict(currentRelocation.destination_district || "");
+
+      // Only set sectors if they exist and a district is selected
+      if (
+        currentRelocation.origin_district &&
+        currentRelocation.origin_sector
+      ) {
+        const originSectors = getSectors(currentRelocation.origin_district);
+        const originSectorExists = originSectors.some(
+          (sector) => sector.name === currentRelocation.origin_sector
+        );
+
+        if (originSectorExists) {
+          setSelectedOriginSector(currentRelocation.origin_sector);
+        }
+      }
+
+      if (
+        currentRelocation.destination_district &&
+        currentRelocation.destination_sector
+      ) {
+        const destSectors = getSectors(currentRelocation.destination_district);
+        const destSectorExists = destSectors.some(
+          (sector) => sector.name === currentRelocation.destination_sector
+        );
+
+        if (destSectorExists) {
+          setSelectedDestSector(currentRelocation.destination_sector);
+        }
       }
     }
-    
-    if (currentRelocation.destination_district && currentRelocation.destination_sector) {
-      const destSectors = getSectors(currentRelocation.destination_district);
-      const destSectorExists = destSectors.some(
-        sector => sector.name === currentRelocation.destination_sector
-      );
-      
-      if (destSectorExists) {
-        setSelectedDestSector(currentRelocation.destination_sector);
-      }
-    }
-  }
-}, [currentRelocation, isModalOpen]);
+  }, [currentRelocation, isModalOpen]);
 
   // Add a debugging useEffect to track all form state changes
   useEffect(() => {
@@ -328,30 +335,244 @@ useEffect(() => {
   const handleDownload = {
     PDF: () => {
       const doc = new jsPDF();
-      doc.autoTable({ html: "#relocation-table" });
-      doc.save("relocations.pdf");
+
+      // Add logo to the top left corner
+      const logoWidth = 30;
+      const logoHeight = 15;
+      doc.addImage(Logo, "PNG", 10, 10, logoWidth, logoHeight);
+
+      // Add title and header (shifted down to accommodate logo)
+      doc.setFontSize(18);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Relocation Management Report", 105, 25, { align: "center" });
+
+      doc.setFontSize(12);
+      doc.text(`From: ${new Date().toLocaleDateString()}`, 14, 35);
+      doc.text(`To: ${new Date().toLocaleDateString()}`, 14, 40);
+      doc.text("Type: Comprehensive Relocation Analysis", 14, 45);
+
+      // Add summary statistics (adjusted y positions)
+      doc.setFontSize(14);
+      doc.text("Summary Statistics", 14, 55);
+
+      const totalRelocations = relocations.length;
+      const pendingRelocations = relocations.filter(
+        (r) => r.status === "pending"
+      ).length;
+      const completedRelocations = relocations.filter(
+        (r) => r.status === "completed"
+      ).length;
+      const inProgressRelocations = relocations.filter(
+        (r) => r.status === "in_progress"
+      ).length;
+      const canceledRelocations = relocations.filter(
+        (r) => r.status === "canceled"
+      ).length;
+
+      doc.setFontSize(11);
+      doc.text(`Total Relocations: ${totalRelocations}`, 20, 65);
+      doc.text(`Pending: ${pendingRelocations}`, 20, 70);
+      doc.text(`In Progress: ${inProgressRelocations}`, 20, 75);
+      doc.text(`Completed: ${completedRelocations}`, 20, 80);
+      doc.text(`Canceled: ${canceledRelocations}`, 20, 85);
+
+      // Add relocation data table (adjusted startY)
+      doc.setFontSize(14);
+      doc.text("Relocation Details", 14, 95);
+
+      const headers = [
+        "ID",
+        "Origin",
+        "Destination",
+        "Size",
+        "Status",
+        "Move Date",
+        "Cost",
+      ];
+
+      const data = relocations.map((relocation) => [
+        relocation.id,
+        `${relocation.origin_sector}, ${relocation.origin_district}`,
+        `${relocation.destination_sector}, ${relocation.destination_district}`,
+        relocation.relocation_size,
+        relocation.status,
+        new Date(relocation.move_datetime).toLocaleDateString(),
+        `$${Number(relocation.adjusted_cost).toFixed(2)}`,
+      ]);
+
+      doc.autoTable({
+        startY: 100, // Adjusted start position
+        head: [headers],
+        body: data,
+        theme: "grid",
+        headStyles: {
+          fillColor: [255, 0, 0], // Red header
+          textColor: [255, 255, 255],
+        },
+        alternateRowStyles: {
+          fillColor: [240, 240, 240],
+        },
+      });
+
+      // Add footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(10);
+        doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: "center" });
+        doc.text(`Printed on: ${new Date().toLocaleDateString()}`, 105, 290, {
+          align: "center",
+        });
+      }
+
+      doc.save("relocation_report.pdf");
     },
+
     Excel: () => {
       const workbook = XLSX.utils.book_new();
+
+      // Summary sheet
+      const summaryData = [
+        ["Relocation Management Report"],
+        [""],
+        ["From:", new Date().toLocaleDateString()],
+        ["To:", new Date().toLocaleDateString()],
+        ["Type:", "Comprehensive Relocation Analysis"],
+        [""],
+        ["Summary Statistics"],
+        ["Total Relocations:", relocations.length],
+        ["Pending:", relocations.filter((r) => r.status === "pending").length],
+        [
+          "Completed:",
+          relocations.filter((r) => r.status === "completed").length,
+        ],
+        [
+          "In Progress:",
+          relocations.filter((r) => r.status === "in_progress").length,
+        ],
+        [
+          "Canceled:",
+          relocations.filter((r) => r.status === "canceled").length,
+        ],
+        [""],
+        ["Relocation Details"],
+      ];
+
       XLSX.utils.book_append_sheet(
         workbook,
-        XLSX.utils.json_to_sheet(relocations),
-        "Relocations"
+        XLSX.utils.aoa_to_sheet(summaryData),
+        "Summary"
       );
-      XLSX.writeFile(workbook, "relocations.xlsx");
+
+      // Data sheet
+      const headers = [
+        "ID",
+        "Origin District",
+        "Origin Sector",
+        "Destination District",
+        "Destination Sector",
+        "Size",
+        "Status",
+        "Move Date",
+        "Cost",
+        "Vehicle",
+        "Driver",
+      ];
+
+      const data = relocations.map((relocation) => [
+        relocation.id,
+        relocation.origin_district,
+        relocation.origin_sector,
+        relocation.destination_district,
+        relocation.destination_sector,
+        relocation.relocation_size,
+        relocation.status,
+        new Date(relocation.move_datetime).toLocaleDateString(),
+        Number(relocation.adjusted_cost).toFixed(2),
+        relocation.vehicle?.plate_number || "N/A",
+        relocation.driver?.user?.phone_number ||
+          relocation.driver?.driving_license_number ||
+          "N/A",
+      ]);
+
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.aoa_to_sheet([headers, ...data]),
+        "Relocation Data"
+      );
+
+      XLSX.writeFile(workbook, "relocation_report.xlsx");
     },
+
     CSV: () => {
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        Object.keys(relocations[0]).join(",") +
-        "\n" +
-        relocations.map((row) => Object.values(row).join(",")).join("\n");
+      // Create summary section
+      let csvContent = "Relocation Management Report\n\n";
+      csvContent += `From:,${new Date().toLocaleDateString()}\n`;
+      csvContent += `To:,${new Date().toLocaleDateString()}\n`;
+      csvContent += "Type:,Comprehensive Relocation Analysis\n\n";
+
+      // Add summary statistics
+      csvContent += "Summary Statistics\n";
+      csvContent += `Total Relocations:,${relocations.length}\n`;
+      csvContent += `Pending:,${
+        relocations.filter((r) => r.status === "pending").length
+      }\n`;
+      csvContent += `Completed:,${
+        relocations.filter((r) => r.status === "completed").length
+      }\n`;
+      csvContent += `In Progress:,${
+        relocations.filter((r) => r.status === "in_progress").length
+      }\n`;
+      csvContent += `Canceled:,${
+        relocations.filter((r) => r.status === "canceled").length
+      }\n\n`;
+
+      // Add relocation data
+      csvContent += "Relocation Details\n";
+      const headers = [
+        "ID",
+        "Origin District",
+        "Origin Sector",
+        "Destination District",
+        "Destination Sector",
+        "Size",
+        "Status",
+        "Move Date",
+        "Cost",
+        "Vehicle",
+        "Driver",
+      ].join(",");
+
+      csvContent += headers + "\n";
+
+      relocations.forEach((relocation) => {
+        csvContent +=
+          [
+            relocation.id,
+            `"${relocation.origin_district}"`,
+            `"${relocation.origin_sector}"`,
+            `"${relocation.destination_district}"`,
+            `"${relocation.destination_sector}"`,
+            relocation.relocation_size,
+            relocation.status,
+            new Date(relocation.move_datetime).toLocaleDateString(),
+            Number(relocation.adjusted_cost).toFixed(2),
+            relocation.vehicle?.plate_number || "N/A",
+            relocation.driver?.user?.phone_number ||
+              relocation.driver?.driving_license_number ||
+              "N/A",
+          ].join(",") + "\n";
+      });
+
       const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "relocations.csv");
+      link.setAttribute(
+        "href",
+        "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent)
+      );
+      link.setAttribute("download", "relocation_report.csv");
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      document.body.removeChild(link);
     },
   };
 
@@ -754,8 +975,7 @@ useEffect(() => {
                   {drivers.map((driver) => (
                     <option key={driver.id} value={driver.id}>
                       {driver.first_name} {driver.last_name} -{" "}
-                      {driver.user?.phone_number}{" "}
-                      {"   "}
+                      {driver.user?.phone_number} {"   "}
                       {/* {driver.driving_categories} - {"  "} */}
                       {driver.availability_status}
                     </option>
@@ -958,9 +1178,10 @@ useEffect(() => {
                           setDownloadMenuVisible(!downloadMenuVisible)
                         }
                         className="py-2 bg-red-600 px-4 rounded-lg text-white flex items-center justify-center hover:bg-red-700 transition duration-200 w-full sm:w-auto"
+                        title="Export comprehensive report with summary statistics and relocation details"
                       >
                         <FontAwesomeIcon icon={faDownload} className="mr-2" />
-                        Export
+                        Export Report
                       </button>
                       {downloadMenuVisible && (
                         <div className="absolute right-0 mt-2 bg-gray-800 text-gray-200 shadow-lg rounded-lg p-2 z-10 border border-gray-700 w-32">
@@ -979,7 +1200,6 @@ useEffect(() => {
                         </div>
                       )}
                     </div>
-
                     <button
                       onClick={handleCreateRelocationNavigation}
                       className="py-2 bg-blue-600 px-4 rounded-lg text-white flex items-center justify-center hover:bg-blue-700 transition duration-200 w-full sm:w-auto"
@@ -1185,8 +1405,5 @@ useEffect(() => {
     </ErrorBoundary>
   );
 }
-
-
-
 
 export default Customer_Manage_Relocations;

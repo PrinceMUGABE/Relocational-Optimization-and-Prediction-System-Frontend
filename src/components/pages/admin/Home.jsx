@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -1094,6 +1095,11 @@ useEffect(() => {
           <h3 className="text-lg font-semibold mb-4 text-red-500">
             Activity Over Time
           </h3>
+          <p className="text-sm text-gray-400 mb-4">
+    This line chart shows the trend of new users, vehicles, drivers, relocations, 
+    and demands over the selected time period. Use it to track growth patterns 
+    and identify busy periods.
+  </p>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
@@ -1138,6 +1144,11 @@ useEffect(() => {
           <h3 className="text-lg font-semibold mb-4 text-red-500">
             Status Distribution
           </h3>
+          <p className="text-sm text-gray-400 mb-4">
+    This bar chart displays the current status distribution across users, 
+    vehicles, and relocations. It helps visualize the proportion of active 
+    vs. inactive items in your system.
+  </p>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -1185,6 +1196,11 @@ useEffect(() => {
           <h3 className="text-lg font-semibold mb-4 text-red-500">
             Feedback Rating Distribution
           </h3>
+          <p className="text-sm text-gray-400 mb-4">
+    The pie chart breaks down customer feedback by star rating. Green sections 
+    represent positive ratings (3-5 stars), while red shows negative ratings 
+    (1-2 stars). The percentages show each rating's proportion.
+  </p>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -1225,6 +1241,11 @@ useEffect(() => {
           <h3 className="text-lg font-semibold mb-4 text-red-500">
             Feedback Rating Trend
           </h3>
+          <p className="text-sm text-gray-400 mb-4">
+    This area chart tracks the monthly average rating (red line) and total 
+    feedback volume (blue area). Use it to monitor customer satisfaction 
+    trends over time and correlate with system changes.
+  </p>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={feedbackMetrics.ratingTrend}>
