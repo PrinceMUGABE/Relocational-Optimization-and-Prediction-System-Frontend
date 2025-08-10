@@ -38,6 +38,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import Logo from "../../../assets/pictures/logo.png";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -86,10 +87,18 @@ function Admin_Manage_Vehicles() {
   const token = localStorage.getItem("token");
   const [phoneNumber, setPhoneNumber] = useState("");
 
+  const [activeFilters, setActiveFilters] = useState({
+    type: [],
+    relocationSize: [],
+    drivingCategory: [],
+    weightRange: [],
+  });
+
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Read file as base64
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedImage(reader.result);
@@ -110,16 +119,6 @@ function Admin_Manage_Vehicles() {
     }
     handleFetch();
   }, [navigate]);
-
-  const [activeFilters, setActiveFilters] = useState({
-    type: [],
-    relocationSize: [],
-    drivingCategory: [],
-    weightRange: [],
-  });
-
-  // Add this for filter drawer
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
   const handleFetch = async () => {
     try {
@@ -148,125 +147,416 @@ function Admin_Manage_Vehicles() {
     }
   };
 
+  // Helper function to get summary stats for filtered data
+  const getFilteredSummaryStats = (data) => {
+    if (!data.length) return {
+      totalVehicles: 0,
+      avgWeight: '0.00',
+      uniqueTypes: 0,
+      mostCommonType: 'None'
+    };
+
+    const avgWeight = data.reduce(
+      (sum, vehicle) => sum + parseFloat(vehicle.total_weight_to_carry),
+      0
+    ) / data.length;
+
+    const uniqueTypes = [...new Set(data.map((v) => v.type))];
+
+    const typeCounts = data.reduce((acc, vehicle) => {
+      acc[vehicle.type] = (acc[vehicle.type] || 0) + 1;
+      return acc;
+    }, {});
+    const mostCommonType = Object.entries(typeCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || "None";
+
+    return {
+      totalVehicles: data.length,
+      avgWeight: avgWeight.toFixed(2),
+      uniqueTypes: uniqueTypes.length,
+      mostCommonType,
+    };
+  };
+
+  // Enhanced download functions with filtered data and analysis
   const handleDownload = {
     PDF: () => {
       const doc = new jsPDF();
-      doc.autoTable({ html: "#vehicle-table" });
-      doc.save("vehicles.pdf");
+      
+      // Add logo
+      try {
+        doc.addImage(Logo, 'PNG', 15, 15, 30, 30);
+      } catch (error) {
+        console.log('Logo could not be added:', error);
+      }
+      
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(220, 38, 127);
+      doc.text('RELOCATION MANAGEMENT SYSTEM', 105, 25, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text('Vehicle Management Report', 105, 35, { align: 'center' });
+      doc.text('Generated on: ' + new Date().toLocaleString(), 105, 42, { align: 'center' });
+      
+      // Summary section
+      const stats = getSummaryStats();
+      const filteredStats = getFilteredSummaryStats(filteredAndSortedData);
+      
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text('Executive Summary', 15, 60);
+      
+      const summaryData = [
+        ['Total Vehicles in System', stats.totalVehicles.toString()],
+        ['Filtered Results', filteredStats.totalVehicles.toString()],
+        ['Average Weight Capacity', filteredStats.avgWeight + ' kg'],
+        ['Most Common Type', filteredStats.mostCommonType],
+        ['Vehicle Types (Filtered)', filteredStats.uniqueTypes.toString()],
+      ];
+      
+      doc.autoTable({
+        startY: 70,
+        head: [['Metric', 'Value']],
+        body: summaryData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [220, 38, 127],
+          textColor: 255,
+          fontSize: 10,
+          fontStyle: 'bold'
+        },
+        bodyStyles: {
+          fontSize: 9,
+          cellPadding: 3
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { left: 15, right: 15 },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 40, halign: 'center' }
+        }
+      });
+      
+      // Key Insights
+      const finalY = doc.lastAutoTable.finalY || 120;
+      doc.setFontSize(12);
+      doc.setTextColor(220, 38, 127);
+      doc.text('Key Insights', 15, finalY + 15);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0);
+      const insights = [
+        `• Total of ${filteredStats.totalVehicles} vehicles match current filter criteria`,
+        `• Average weight capacity across filtered vehicles: ${filteredStats.avgWeight} kg`,
+        `• ${filteredStats.uniqueTypes} different vehicle types in filtered results`,
+        `• Most represented vehicle type: ${filteredStats.mostCommonType}`,
+      ];
+      
+      insights.forEach((insight, index) => {
+        doc.text(insight, 20, finalY + 25 + (index * 7));
+      });
+      
+      // Main data table
+      const tableStartY = finalY + 55;
+      const tableData = filteredAndSortedData.map((vehicle, index) => [
+        (index + 1).toString(),
+        vehicle.type,
+        vehicle.vehicle_model || 'N/A',
+        vehicle.plate_number || 'N/A',
+        vehicle.relocation_size,
+        vehicle.driving_category,
+        vehicle.total_weight_to_carry + ' kg',
+        vehicle.total_man_power.toString(),
+        new Date(vehicle.created_date).toLocaleDateString()
+      ]);
+      
+      doc.autoTable({
+        startY: tableStartY,
+        head: [['#', 'Type', 'Model', 'Plate', 'Size', 'License', 'Weight', 'Manpower', 'Created']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [220, 38, 127],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: 'bold'
+        },
+        bodyStyles: {
+          fontSize: 7,
+          cellPadding: 2
+        },
+        alternateRowStyles: {
+          fillColor: [248, 248, 248]
+        },
+        margin: { left: 15, right: 15 },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 15, halign: 'center' },
+          5: { cellWidth: 15, halign: 'center' },
+          6: { cellWidth: 20, halign: 'center' },
+          7: { cellWidth: 15, halign: 'center' },
+          8: { cellWidth: 25 }
+        }
+      });
+      
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(
+          `Page ${i} of ${pageCount} | Generated: ${new Date().toLocaleString()}`,
+          105,
+          doc.internal.pageSize.height - 10,
+          { align: 'center' }
+        );
+      }
+      
+      doc.save(`vehicles-report-${new Date().toISOString().split('T')[0]}.pdf`);
     },
+
     Excel: () => {
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(vehicleData),
-        "Vehicles"
+      
+      // Summary worksheet
+      const summaryStats = getFilteredSummaryStats(filteredAndSortedData);
+      const summaryData = [
+        ['VEHICLE MANAGEMENT REPORT'],
+        ['Generated on:', new Date().toLocaleString()],
+        [''],
+        ['EXECUTIVE SUMMARY'],
+        ['Total Vehicles (Filtered):', summaryStats.totalVehicles],
+        ['Average Weight Capacity:', summaryStats.avgWeight + ' kg'],
+        ['Vehicle Types:', summaryStats.uniqueTypes],
+        ['Most Common Type:', summaryStats.mostCommonType],
+        [''],
+        ['FILTER SUMMARY'],
+        ['Applied Filters:', Object.values(activeFilters).flat().length > 0 ? 'Yes' : 'No'],
+      ];
+      
+      Object.entries(activeFilters).forEach(([filterType, values]) => {
+        if (values.length > 0) {
+          summaryData.push([`${filterType}:`, values.join(', ')]);
+        }
+      });
+      
+      const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+      summaryWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 1 } },
+        { s: { r: 9, c: 0 }, e: { r: 9, c: 1 } }
+      ];
+      
+      XLSX.utils.book_append_sheet(workbook, summaryWs, "Summary");
+      
+      // Main data worksheet
+      const enhancedData = filteredAndSortedData.map((vehicle, index) => ({
+        'S/N': index + 1,
+        'Vehicle Type': vehicle.type,
+        'Vehicle Model': vehicle.vehicle_model || 'N/A',
+        'Plate Number': vehicle.plate_number || 'N/A',
+        'Relocation Size': vehicle.relocation_size,
+        'Driving License Category': vehicle.driving_category,
+        'Weight Capacity (kg)': vehicle.total_weight_to_carry,
+        'Required Manpower': vehicle.total_man_power,
+        'Date Created': new Date(vehicle.created_date).toLocaleDateString(),
+        'Date Created (Full)': new Date(vehicle.created_date).toLocaleString()
+      }));
+      
+      const dataWs = XLSX.utils.json_to_sheet(enhancedData);
+      dataWs['!cols'] = [
+        { wch: 5 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
+        { wch: 20 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 20 }
+      ];
+      
+      XLSX.utils.book_append_sheet(workbook, dataWs, "Vehicles Data");
+      
+      // Analytics worksheet
+      const typeDistribution = Object.entries(
+        filteredAndSortedData.reduce((acc, vehicle) => {
+          acc[vehicle.type] = (acc[vehicle.type] || 0) + 1;
+          return acc;
+        }, {})
       );
-      XLSX.writeFile(workbook, "vehicles.xlsx");
+      
+      const analyticsData = [
+        ['VEHICLE ANALYTICS'],
+        [''],
+        ['Vehicle Type Distribution:'],
+        ['Type', 'Count', 'Percentage'],
+        ...typeDistribution.map(([type, count]) => [
+          type,
+          count,
+          ((count / filteredAndSortedData.length) * 100).toFixed(2) + '%'
+        ]),
+        [''],
+        ['Weight Distribution Analysis:'],
+        ['Range', 'Count'],
+      ];
+      
+      const weightRanges = filteredAndSortedData.reduce((acc, vehicle) => {
+        const weight = parseFloat(vehicle.total_weight_to_carry);
+        const range = Math.floor(weight / 1000) * 1000;
+        const rangeKey = `${range}-${range + 1000} kg`;
+        acc[rangeKey] = (acc[rangeKey] || 0) + 1;
+        return acc;
+      }, {});
+      
+      Object.entries(weightRanges).forEach(([range, count]) => {
+        analyticsData.push([range, count]);
+      });
+      
+      const analyticsWs = XLSX.utils.aoa_to_sheet(analyticsData);
+      XLSX.utils.book_append_sheet(workbook, analyticsWs, "Analytics");
+      
+      XLSX.writeFile(workbook, `vehicles-report-${new Date().toISOString().split('T')[0]}.xlsx`);
     },
+
     CSV: () => {
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        Object.keys(vehicleData[0]).join(",") +
-        "\n" +
-        vehicleData.map((row) => Object.values(row).join(",")).join("\n");
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "vehicles.csv");
+      const summaryStats = getFilteredSummaryStats(filteredAndSortedData);
+      
+      let csvContent = "VEHICLE MANAGEMENT REPORT\n";
+      csvContent += `Generated on,${new Date().toLocaleString()}\n`;
+      csvContent += `Total Vehicles (Filtered),${summaryStats.totalVehicles}\n`;
+      csvContent += `Average Weight Capacity,${summaryStats.avgWeight} kg\n`;
+      csvContent += `Vehicle Types,${summaryStats.uniqueTypes}\n`;
+      csvContent += `Most Common Type,${summaryStats.mostCommonType}\n`;
+      csvContent += "\n";
+      
+      if (Object.values(activeFilters).flat().length > 0) {
+        csvContent += "APPLIED FILTERS\n";
+        Object.entries(activeFilters).forEach(([filterType, values]) => {
+          if (values.length > 0) {
+            csvContent += `${filterType},"${values.join(', ')}"\n`;
+          }
+        });
+        csvContent += "\n";
+      }
+      
+      csvContent += "VEHICLE DATA\n";
+      
+      const headers = [
+        'S/N', 'Vehicle Type', 'Vehicle Model', 'Plate Number',
+        'Relocation Size', 'Driving License Category', 'Weight Capacity (kg)',
+        'Required Manpower', 'Date Created'
+      ];
+      
+      csvContent += headers.join(',') + '\n';
+      
+      filteredAndSortedData.forEach((vehicle, index) => {
+        const row = [
+          index + 1,
+          `"${vehicle.type}"`,
+          `"${vehicle.vehicle_model || 'N/A'}"`,
+          `"${vehicle.plate_number || 'N/A'}"`,
+          `"${vehicle.relocation_size}"`,
+          `"${vehicle.driving_category}"`,
+          vehicle.total_weight_to_carry,
+          vehicle.total_man_power,
+          `"${new Date(vehicle.created_date).toLocaleDateString()}"`
+        ];
+        csvContent += row.join(',') + '\n';
+      });
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `vehicles-report-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
-      link.remove();
-    },
+      document.body.removeChild(link);
+    }
   };
 
   const handleAddUpdateVehicle = async (e) => {
-  e.preventDefault();
-  try {
-    const vehicleData = {
-      type: e.target.type.value,
-      total_weight_to_carry: e.target.total_weight.value,
-      relocation_size: e.target.relocation_size.value,
-      vehicle_model: e.target.vehicle_model.value,
-      plate_number: e.target.plate_number.value,
-      driving_category: e.target.driving_category.value,
-      total_man_power: e.target.total_man_power.value,
-    };
+    e.preventDefault();
+    try {
+      const vehicleData = {
+        type: e.target.type.value,
+        total_weight_to_carry: e.target.total_weight.value,
+        relocation_size: e.target.relocation_size.value,
+        vehicle_model: e.target.vehicle_model.value,
+        plate_number: e.target.plate_number.value,
+        driving_category: e.target.driving_category.value,
+        total_man_power: e.target.total_man_power.value,
+      };
 
-    // Add image base64 if selected or existing
-    if (selectedImage) {
-      vehicleData.image_base64 = selectedImage;
-    }
+      if (selectedImage) {
+        vehicleData.image_base64 = selectedImage;
+      }
 
-    if (currentVehicle) {
-      // Update existing vehicle
-      console.log("Updating vehicle with data:", vehicleData);
-      
-      const response = await axios.put(
-        `${BASE_URL}update_vehicle/${currentVehicle.id}/`,
-        vehicleData,
-        {
+      if (currentVehicle) {
+        console.log("Updating vehicle with data:", vehicleData);
+        
+        const response = await axios.put(
+          `${BASE_URL}update_vehicle/${currentVehicle.id}/`,
+          vehicleData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        
+        console.log("Update response:", response.data);
+        setMessage("Vehicle updated successfully");
+      } else {
+        const response = await axios.post(`${BASE_URL}create_vehicle/`, vehicleData, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
-      );
-      
-      console.log("Update response:", response.data);
-      setMessage("Vehicle updated successfully");
-    } else {
-      // Create new vehicle
-      const response = await axios.post(`${BASE_URL}create_vehicle/`, vehicleData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      
-      console.log("Create response:", response.data);
-      setMessage("Vehicle created successfully");
-    }
-
-    await handleFetch();
-    setIsModalOpen(false);
-    setCurrentVehicle(null);
-    setSelectedImage(null);
-    setImagePreview(null);
-    setMessageType("success");
-  } catch (err) {
-    console.error("Error in handleAddUpdateVehicle:", err);
-    
-    // More detailed error handling
-    if (err.response) {
-      // Server responded with error status
-      console.error("Response data:", err.response.data);
-      console.error("Response status:", err.response.status);
-      
-      if (err.response.status === 404) {
-        setMessage("Vehicle not found or endpoint not available. Please check the vehicle ID and try again.");
-      } else if (err.response.status === 401) {
-        setMessage("Unauthorized. Please log in again.");
-        // Optionally redirect to login
-        // navigate("/login");
-      } else if (err.response.status === 403) {
-        setMessage("You don't have permission to perform this action.");
-      } else {
-        setMessage(err.response?.data?.error || err.response?.data?.message || "An error occurred while updating the vehicle");
+        });
+        
+        console.log("Create response:", response.data);
+        setMessage("Vehicle created successfully");
       }
-    } else if (err.request) {
-      // Request made but no response received
-      console.error("No response received:", err.request);
-      setMessage("Network error. Please check your connection and try again.");
-    } else {
-      // Something else happened
-      console.error("Error message:", err.message);
-      setMessage("An unexpected error occurred. Please try again.");
-    }
-    
-    setMessageType("error");
-  }
-};
 
-  // Modify modal opening to reset image states
+      await handleFetch();
+      setIsModalOpen(false);
+      setCurrentVehicle(null);
+      setSelectedImage(null);
+      setImagePreview(null);
+      setMessageType("success");
+    } catch (err) {
+      console.error("Error in handleAddUpdateVehicle:", err);
+      
+      if (err.response) {
+        console.error("Response data:", err.response.data);
+        console.error("Response status:", err.response.status);
+        
+        if (err.response.status === 404) {
+          setMessage("Vehicle not found or endpoint not available. Please check the vehicle ID and try again.");
+        } else if (err.response.status === 401) {
+          setMessage("Unauthorized. Please log in again.");
+        } else if (err.response.status === 403) {
+          setMessage("You don't have permission to perform this action.");
+        } else {
+          setMessage(err.response?.data?.error || err.response?.data?.message || "An error occurred while updating the vehicle");
+        }
+      } else if (err.request) {
+        console.error("No response received:", err.request);
+        setMessage("Network error. Please check your connection and try again.");
+      } else {
+        console.error("Error message:", err.message);
+        setMessage("An unexpected error occurred. Please try again.");
+      }
+      
+      setMessageType("error");
+    }
+  };
+
   const openModal = (vehicle = null) => {
     setCurrentVehicle(vehicle);
     setSelectedImage(null);
@@ -278,16 +568,15 @@ function Admin_Manage_Vehicles() {
     if (!vehicleData.length) return null;
 
     const vehicleTypeData = Object.entries(
-      vehicleData.reduce((acc, vehicle) => {
+      filteredAndSortedData.reduce((acc, vehicle) => {
         acc[vehicle.type] = (acc[vehicle.type] || 0) + 1;
         return acc;
       }, {})
     ).map(([type, value]) => ({ name: type, value }));
 
     const vehicleWeightData = Object.entries(
-      vehicleData.reduce((acc, vehicle) => {
-        const weightRange =
-          Math.floor(vehicle.total_weight_to_carry / 1000) * 1000;
+      filteredAndSortedData.reduce((acc, vehicle) => {
+        const weightRange = Math.floor(vehicle.total_weight_to_carry / 1000) * 1000;
         acc[weightRange] = (acc[weightRange] || 0) + 1;
         return acc;
       }, {})
@@ -296,26 +585,13 @@ function Admin_Manage_Vehicles() {
       count,
     }));
 
-    const handleImageChange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        // Read file as base64
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setSelectedImage(reader.result);
-          setImagePreview(reader.result);
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-
     return (
       <div className="w-full lg:w-1/3 space-y-6">
         <ErrorBoundary>
           <div className="bg-gray-900 p-6 rounded-lg shadow-lg border border-gray-800 h-72">
             <h3 className="text-sm font-semibold mb-4 text-red-400 flex items-center">
               <FontAwesomeIcon icon={faTruck} className="mr-2" />
-              Vehicle Type Distribution
+              Vehicle Type Distribution (Filtered)
             </h3>
             <ResponsiveContainer>
               <PieChart>
@@ -360,7 +636,7 @@ function Admin_Manage_Vehicles() {
           <div className="bg-gray-900 p-6 rounded-lg shadow-lg border border-gray-800 h-72">
             <h3 className="text-sm font-semibold mb-4 text-red-400 flex items-center">
               <FontAwesomeIcon icon={faChartPie} className="mr-2" />
-              Vehicle Weight Distribution
+              Weight Distribution (Filtered)
             </h3>
             <ResponsiveContainer>
               <LineChart data={vehicleWeightData}>
@@ -395,14 +671,7 @@ function Admin_Manage_Vehicles() {
     );
   };
 
-  const filteredData = vehicleData.filter((vehicle) =>
-    [vehicle.type, vehicle.total_weight_to_carry.toString()].some((field) =>
-      field?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
-
-   // Update the filteredData variable to include both search and filters
-   const searchFilteredData = vehicleData.filter((vehicle) =>
+  const searchFilteredData = vehicleData.filter((vehicle) =>
     [
       vehicle.type,
       vehicle.total_weight_to_carry.toString(),
@@ -412,11 +681,8 @@ function Admin_Manage_Vehicles() {
     ].some((field) => field?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  
-
   const applyFilters = (data) => {
     return data.filter((vehicle) => {
-      // Check type filter
       if (
         activeFilters.type.length > 0 &&
         !activeFilters.type.includes(vehicle.type)
@@ -424,7 +690,6 @@ function Admin_Manage_Vehicles() {
         return false;
       }
 
-      // Check relocation size filter
       if (
         activeFilters.relocationSize.length > 0 &&
         !activeFilters.relocationSize.includes(vehicle.relocation_size)
@@ -432,7 +697,6 @@ function Admin_Manage_Vehicles() {
         return false;
       }
 
-      // Check driving category filter
       if (
         activeFilters.drivingCategory.length > 0 &&
         !activeFilters.drivingCategory.includes(vehicle.driving_category)
@@ -440,7 +704,6 @@ function Admin_Manage_Vehicles() {
         return false;
       }
 
-      // Check weight range filter
       if (activeFilters.weightRange.length > 0) {
         const weight = parseFloat(vehicle.total_weight_to_carry);
         return activeFilters.weightRange.some((range) => {
@@ -452,7 +715,6 @@ function Admin_Manage_Vehicles() {
       return true;
     });
   };
-
   const filteredAndSortedData = applyFilters(searchFilteredData);
 
 

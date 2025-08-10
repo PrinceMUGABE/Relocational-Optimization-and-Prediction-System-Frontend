@@ -13,6 +13,7 @@ import {
   faUserShield, faUserTie, faUserCheck, faSortAmountDown, faSortAmountUp
 } from "@fortawesome/free-solid-svg-icons";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
+import Logo from "../../../assets/pictures/logo.png";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -112,29 +113,452 @@ function Users() {
     }
   };
 
-  const handleDownload = {
-    PDF: () => {
+ const getImageBase64 = (imgPath) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      const dataURL = canvas.toDataURL('image/png');
+      resolve(dataURL);
+    };
+    img.onerror = () => {
+      console.warn('Could not load logo image');
+      resolve(null);
+    };
+    img.src = imgPath;
+  });
+};
+
+// Enhanced download functions with filtered data and comprehensive analysis
+const handleDownload = {
+  PDF: async () => {
+    const doc = new jsPDF();
+    
+    try {
+      // Convert logo to base64
+      const logoBase64 = await getImageBase64(Logo);
+      
+      // Add logo if conversion was successful
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'PNG', 20, 10, 25, 25);
+        
+        // Header with logo
+        doc.setFontSize(18);
+        doc.setTextColor(220, 38, 38);
+        doc.text("RELOCATION MANAGEMENT SYSTEM", 55, 20);
+        
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text("User Management Report", 55, 28);
+        
+        doc.setFontSize(10);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 55, 35);
+      } else {
+        // Fallback without logo
+        doc.setFontSize(18);
+        doc.setTextColor(220, 38, 38);
+        doc.text("RELOCATION MANAGEMENT SYSTEM", 20, 20);
+        
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text("User Management Report", 20, 30);
+        
+        doc.setFontSize(10);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, 38);
+      }
+      
+      // Executive Summary Section
+      doc.setFontSize(12);
+      doc.setTextColor(220, 38, 38);
+      doc.text("Executive Summary", 20, 55);
+      
+      // Calculate comprehensive metrics
+      const totalUsers = userData.length;
+      const filteredUsers = filteredSortedData.length;
+      const filteredPercentage = totalUsers > 0 ? ((filteredUsers / totalUsers) * 100).toFixed(1) : 0;
+      
+      // Role distribution from filtered data
+      const roleDistribution = filteredSortedData.reduce((acc, user) => {
+        acc[user.role] = (acc[user.role] || 0) + 1;
+        return acc;
+      }, {});
+      
+      // Recent users (last 30 days) from filtered data
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentUsers = filteredSortedData.filter(user => 
+        new Date(user.created_at) >= thirtyDaysAgo
+      ).length;
+      
+      // Growth calculation
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const usersLast30To60Days = filteredSortedData.filter(user => {
+        const userDate = new Date(user.created_at);
+        return userDate >= sixtyDaysAgo && userDate < thirtyDaysAgo;
+      }).length;
+      
+      const growthRate = usersLast30To60Days > 0 
+        ? ((recentUsers - usersLast30To60Days) / usersLast30To60Days * 100).toFixed(1)
+        : recentUsers > 0 ? 100 : 0;
+
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      
+      let yPosition = 65;
+      const summaryItems = [
+        `• Total Users in System: ${totalUsers}`,
+        `• Filtered Results: ${filteredUsers} users (${filteredPercentage}% of total)`,
+        `• Admins: ${roleDistribution.admin || 0} | Customers: ${roleDistribution.customer || 0} | Drivers: ${roleDistribution.driver || 0}`,
+        `• New Users (Last 30 Days): ${recentUsers} (${growthRate > 0 ? '+' : ''}${growthRate}% growth)`,
+        `• Report Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+      ];
+      
+      // Add active filters information
+      const activeFilters = [];
+      if (filters.role) activeFilters.push(`Role: ${getRoleDisplayName(filters.role)}`);
+      if (filters.dateFrom) activeFilters.push(`From: ${new Date(filters.dateFrom).toLocaleDateString()}`);
+      if (filters.dateTo) activeFilters.push(`To: ${new Date(filters.dateTo).toLocaleDateString()}`);
+      if (searchQuery) activeFilters.push(`Search: "${searchQuery}"`);
+      
+      if (activeFilters.length > 0) {
+        summaryItems.push(`• Active Filters: ${activeFilters.join(', ')}`);
+      }
+      
+      summaryItems.forEach(item => {
+        doc.text(item, 25, yPosition);
+        yPosition += 7;
+      });
+      
+      // Key Insights Section
+      yPosition += 5;
+      doc.setFontSize(12);
+      doc.setTextColor(220, 38, 38);
+      doc.text("Key Insights", 20, yPosition);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      yPosition += 10;
+      
+      // Generate dynamic insights
+      const insights = [];
+      const mostCommonRole = Object.entries(roleDistribution)
+        .sort(([,a], [,b]) => b - a)[0];
+      
+      if (mostCommonRole) {
+        insights.push(`• ${getRoleDisplayName(mostCommonRole[0])} is the most common user type (${mostCommonRole[1]} users)`);
+      }
+      
+      if (growthRate > 10) {
+        insights.push(`• Strong user growth: ${growthRate}% increase in new registrations`);
+      } else if (growthRate < -10) {
+        insights.push(`• User registration has declined by ${Math.abs(growthRate)}% in the last 30 days`);
+      } else {
+        insights.push(`• User registration rate is stable with ${growthRate}% change`);
+      }
+      
+      if (filteredUsers < totalUsers * 0.5) {
+        insights.push(`• Current filters are showing ${filteredPercentage}% of total users`);
+      }
+      
+      insights.forEach(insight => {
+        doc.text(insight, 25, yPosition);
+        yPosition += 7;
+      });
+      
+      // User Details Table
+      if (filteredSortedData.length > 0) {
+        const tableData = filteredSortedData.map((user, index) => [
+          index + 1,
+          user.phone_number || 'N/A',
+          user.email || 'N/A',
+          getRoleDisplayName(user.role),
+          new Date(user.created_at).toLocaleDateString(),
+        ]);
+
+        doc.autoTable({
+          head: [["#", "Phone Number", "Email", "Role", "Created Date"]],
+          body: tableData,
+          startY: yPosition + 10,
+          theme: 'grid',
+          headStyles: { 
+            fillColor: [220, 38, 38],
+            textColor: [255, 255, 255],
+            fontSize: 9,
+            fontStyle: 'bold'
+          },
+          bodyStyles: {
+            fontSize: 8,
+            textColor: [0, 0, 0]
+          },
+          alternateRowStyles: {
+            fillColor: [248, 249, 250]
+          },
+          styles: {
+            cellPadding: 3,
+            fontSize: 8
+          }
+        });
+      }
+
+      // Add footer with logo on each page
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        // Add small logo in footer if available
+        if (logoBase64) {
+          doc.addImage(logoBase64, 'PNG', 20, doc.internal.pageSize.height - 20, 8, 8);
+        }
+        
+        doc.setFontSize(7);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          `Page ${i} of ${pageCount} - Relocation Management System`, 
+          logoBase64 ? 35 : 20, 
+          doc.internal.pageSize.height - 12
+        );
+        
+        doc.text(
+          `Generated: ${new Date().toLocaleString()}`, 
+          140, 
+          doc.internal.pageSize.height - 12
+        );
+        
+        // Add confidentiality notice
+        doc.text(
+          "CONFIDENTIAL - For Internal Use Only", 
+          logoBase64 ? 35 : 20, 
+          doc.internal.pageSize.height - 6
+        );
+      }
+
+      doc.save(`users_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      
+      // Fallback PDF generation without logo
       const doc = new jsPDF();
-      doc.autoTable({ html: '#user-table' });
-      doc.save('users.pdf');
-    },
-    Excel: () => {
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(filteredSortedData), "Users");
-      XLSX.writeFile(workbook, "users.xlsx");
-    },
-    CSV: () => {
-      const csvContent = "data:text/csv;charset=utf-8," + 
-        Object.keys(filteredSortedData[0]).join(",") + "\n" +
-        filteredSortedData.map(row => Object.values(row).join(",")).join("\n");
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "users.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      doc.setFontSize(18);
+      doc.setTextColor(220, 38, 38);
+      doc.text("RELOCATION MANAGEMENT SYSTEM", 20, 20);
+      
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text("User Management Report", 20, 30);
+      
+      // Basic table with filtered data
+      if (filteredSortedData.length > 0) {
+        const tableData = filteredSortedData.map((user, index) => [
+          index + 1,
+          user.phone_number,
+          user.email,
+          getRoleDisplayName(user.role),
+          new Date(user.created_at).toLocaleDateString(),
+        ]);
+
+        doc.autoTable({
+          head: [["#", "Phone", "Email", "Role", "Created Date"]],
+          body: tableData,
+          startY: 40,
+        });
+      }
+      
+      doc.save("users_report.pdf");
     }
-  };
+  },
+
+  Excel: () => {
+    const workbook = XLSX.utils.book_new();
+    
+    // Create comprehensive summary data
+    const totalUsers = userData.length;
+    const filteredUsers = filteredSortedData.length;
+    
+    const roleDistribution = filteredSortedData.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentUsers = filteredSortedData.filter(user => 
+      new Date(user.created_at) >= thirtyDaysAgo
+    ).length;
+    
+    // Summary Sheet
+    const summaryData = [
+      { Metric: "Report Title", Value: "User Management Analysis Report" },
+      { Metric: "Generated On", Value: new Date().toLocaleString() },
+      { Metric: "Total Users in System", Value: totalUsers },
+      { Metric: "Filtered Results", Value: filteredUsers },
+      { Metric: "Filter Coverage", Value: `${((filteredUsers / totalUsers) * 100).toFixed(1)}%` },
+      { Metric: "", Value: "" }, // Empty row for spacing
+      { Metric: "ROLE DISTRIBUTION", Value: "" },
+      { Metric: "Admins", Value: roleDistribution.admin || 0 },
+      { Metric: "Customers", Value: roleDistribution.customer || 0 },
+      { Metric: "Drivers", Value: roleDistribution.driver || 0 },
+      { Metric: "Other Users", Value: roleDistribution.user || 0 },
+      { Metric: "", Value: "" }, // Empty row
+      { Metric: "ACTIVITY METRICS", Value: "" },
+      { Metric: "New Users (Last 30 Days)", Value: recentUsers },
+      { Metric: "Growth Rate", Value: `${recentUsers > 0 ? '+' : ''}${recentUsers}` },
+    ];
+    
+    // Add active filters to summary
+    if (filters.role || filters.dateFrom || filters.dateTo || searchQuery) {
+      summaryData.push({ Metric: "", Value: "" }); // Empty row
+      summaryData.push({ Metric: "ACTIVE FILTERS", Value: "" });
+      
+      if (searchQuery) summaryData.push({ Metric: "Search Query", Value: searchQuery });
+      if (filters.role) summaryData.push({ Metric: "Role Filter", Value: getRoleDisplayName(filters.role) });
+      if (filters.dateFrom) summaryData.push({ Metric: "Date From", Value: new Date(filters.dateFrom).toLocaleDateString() });
+      if (filters.dateTo) summaryData.push({ Metric: "Date To", Value: new Date(filters.dateTo).toLocaleDateString() });
+      summaryData.push({ Metric: "Sort By", Value: `${filters.sortField} (${filters.sortDirection})` });
+    }
+
+    // Filtered Users Data Sheet
+    const usersSheetData = filteredSortedData.map((user, index) => ({
+      "S/N": index + 1,
+      "Phone Number": user.phone_number || 'N/A',
+      "Email Address": user.email || 'N/A',
+      "User Role": getRoleDisplayName(user.role),
+      "Account Created": new Date(user.created_at).toLocaleDateString(),
+      "Creation Time": new Date(user.created_at).toLocaleTimeString(),
+      "User ID": user.id,
+    }));
+
+    // Role Analysis Sheet
+    const roleAnalysisData = Object.entries(roleDistribution).map(([role, count]) => ({
+      "Role": getRoleDisplayName(role),
+      "Count": count,
+      "Percentage": `${((count / filteredUsers) * 100).toFixed(1)}%`,
+      "Description": {
+        admin: "System administrators with full access",
+        customer: "End users requesting relocation services",
+        driver: "Service providers handling relocations",
+        user: "Basic system users"
+      }[role] || "Standard user account"
+    }));
+
+    // Monthly Registration Trends
+    const monthlyData = filteredSortedData.reduce((acc, user) => {
+      const date = new Date(user.created_at);
+      const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!acc[monthYear]) {
+        acc[monthYear] = { admin: 0, customer: 0, driver: 0, user: 0, total: 0 };
+      }
+      
+      acc[monthYear][user.role] += 1;
+      acc[monthYear].total += 1;
+      return acc;
+    }, {});
+
+    const trendsData = Object.entries(monthlyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([monthYear, counts]) => ({
+        "Month": monthYear,
+        "Total Registrations": counts.total,
+        "Admins": counts.admin,
+        "Customers": counts.customer,
+        "Drivers": counts.driver,
+        "Other Users": counts.user
+      }));
+
+    // Add all sheets to workbook
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryData), "Executive Summary");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(usersSheetData), "Filtered Users");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(roleAnalysisData), "Role Analysis");
+    if (trendsData.length > 0) {
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(trendsData), "Registration Trends");
+    }
+
+    XLSX.writeFile(workbook, `users_comprehensive_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  },
+
+  CSV: () => {
+    // Calculate metrics for CSV summary
+    const totalUsers = userData.length;
+    const filteredUsers = filteredSortedData.length;
+    
+    const roleDistribution = filteredSortedData.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentUsers = filteredSortedData.filter(user => 
+      new Date(user.created_at) >= thirtyDaysAgo
+    ).length;
+
+    // Create comprehensive CSV content
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Header
+    csvContent += "RELOCATION MANAGEMENT SYSTEM - USER MANAGEMENT REPORT\n";
+    csvContent += `Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}\n\n`;
+    
+    // Executive Summary
+    csvContent += "EXECUTIVE SUMMARY\n";
+    csvContent += `Total Users in System,${totalUsers}\n`;
+    csvContent += `Filtered Results Showing,${filteredUsers}\n`;
+    csvContent += `Filter Coverage,${((filteredUsers / totalUsers) * 100).toFixed(1)}%\n`;
+    csvContent += `Admins,${roleDistribution.admin || 0}\n`;
+    csvContent += `Customers,${roleDistribution.customer || 0}\n`;
+    csvContent += `Drivers,${roleDistribution.driver || 0}\n`;
+    csvContent += `Other Users,${roleDistribution.user || 0}\n`;
+    csvContent += `New Users (Last 30 Days),${recentUsers}\n\n`;
+    
+    // Active Filters
+    if (filters.role || filters.dateFrom || filters.dateTo || searchQuery) {
+      csvContent += "ACTIVE FILTERS\n";
+      if (searchQuery) csvContent += `Search Query,"${searchQuery}"\n`;
+      if (filters.role) csvContent += `Role Filter,${getRoleDisplayName(filters.role)}\n`;
+      if (filters.dateFrom) csvContent += `Date From,${new Date(filters.dateFrom).toLocaleDateString()}\n`;
+      if (filters.dateTo) csvContent += `Date To,${new Date(filters.dateTo).toLocaleDateString()}\n`;
+      csvContent += `Sort By,${filters.sortField} (${filters.sortDirection})\n\n`;
+    }
+    
+    // User Details
+    csvContent += "FILTERED USER DETAILS\n";
+    csvContent += "S/N,Phone Number,Email Address,User Role,Account Created,Creation Time,User ID\n";
+    
+    filteredSortedData.forEach((user, index) => {
+      const createdDate = new Date(user.created_at);
+      csvContent += `${index + 1},"${user.phone_number || 'N/A'}","${user.email || 'N/A'}",${getRoleDisplayName(user.role)},${createdDate.toLocaleDateString()},${createdDate.toLocaleTimeString()},${user.id}\n`;
+    });
+
+    // Role Distribution Summary
+    csvContent += "\nROLE DISTRIBUTION ANALYSIS\n";
+    csvContent += "Role,Count,Percentage,Description\n";
+    Object.entries(roleDistribution).forEach(([role, count]) => {
+      const percentage = ((count / filteredUsers) * 100).toFixed(1);
+      const description = {
+        admin: "System administrators with full access",
+        customer: "End users requesting relocation services", 
+        driver: "Service providers handling relocations",
+        user: "Basic system users"
+      }[role] || "Standard user account";
+      
+      csvContent += `${getRoleDisplayName(role)},${count},${percentage}%,"${description}"\n`;
+    });
+
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `users_detailed_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+};
 
   const getRoleDisplayName = role => ({
     admin: "Admin",

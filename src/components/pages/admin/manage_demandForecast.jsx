@@ -41,7 +41,7 @@ import {
   ComposedChart,
   Brush,
 } from "recharts";
-
+import Logo from "../../../assets/pictures/logo.png";
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -112,62 +112,56 @@ function Admin_DemandForecast() {
     fetchRegionalData();
   }, [navigate]);
 
-  const fetchForecastData = async () => {
-    setLoading(true);
-    try {
-      // Fetch forecast data
-      const res = await axios.get("http://127.0.0.1:8000/demand/forecasts/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+ const fetchForecastData = async () => {
+  setLoading(true);
+  try {
+    // Fetch forecast data
+    const res = await axios.get("http://127.0.0.1:8000/demand/forecasts/", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      if (res.data.past_data) {
-        // Transform historical data
-        const histData = res.data.past_data
-          .map((item) => {
-            const date = new Date(item.move_datetime);
-            return {
-              date: date.toLocaleDateString(),
-              timestamp: date.getTime(),
-              count: item.count,
-              month: date.toLocaleString("default", { month: "short" }),
-              week: Math.ceil(date.getDate() / 7),
-            };
-          })
-          .sort((a, b) => a.timestamp - b.timestamp);
+    console.log("Fetched forecast: ", res.data);
 
-        setHistoricalData(histData);
+    if (res.data.past_data) {
+      // Transform historical data
+      const histData = res.data.past_data
+        .map((item) => {
+          const date = new Date(item.date); // Use item.date instead of item.move_datetime
+          return {
+            date: date.toLocaleDateString(),
+            timestamp: date.getTime(),
+            count: item.count,
+            month: date.toLocaleString("default", { month: "short" }),
+            week: Math.ceil(date.getDate() / 7),
+          };
+        })
+        .sort((a, b) => a.timestamp - b.timestamp);
 
-        // Process data for comparison chart
-        processComparisonData(histData, res.data.predicted_demand);
-      }
+      setHistoricalData(histData);
 
-      // Format forecast data for display
-      const forecasts = await axios.get(
-        "http://127.0.0.1:8000/demand/forecasts/",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      console.log("Fetched forecast: ", forecasts.data);
-
-      const formattedForecasts = forecasts.data.predicted_demand ? [{
-        id: Date.now(),
-        predicted_demand: forecasts.data.predicted_demand,
-        forecast_date: new Date().toISOString().split("T")[0],
-        created_at: new Date().toLocaleString(),
-        accuracy: calculateAccuracy(forecasts.data.predicted_demand, historicalData)
-      }] : [];
-
-      setForecastData(formattedForecasts);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error fetching forecast data:", err);
-      setMessage("Failed to fetch forecast data. Please try again.");
-      setMessageType("error");
-      setLoading(false);
+      // Process data for comparison chart - use the correct prediction value
+      const predictedDemand = res.data.predictions?.monthly_demand || res.data.predicted_demand || 0;
+      processComparisonData(histData, predictedDemand);
     }
-  };
+
+    // Format forecast data for display - use correct API structure
+    const formattedForecasts = res.data.predictions ? [{
+      id: res.data.forecast_id || Date.now(),
+      predicted_demand: res.data.predictions.monthly_demand || 0, // Fix: use correct path
+      forecast_date: new Date().toISOString().split("T")[0],
+      created_at: new Date().toLocaleString(),
+      accuracy: calculateAccuracy(res.data.predictions.monthly_demand || 0, res.data.past_data || [])
+    }] : [];
+
+    setForecastData(formattedForecasts);
+    setLoading(false);
+  } catch (err) {
+    console.error("Error fetching forecast data:", err);
+    setMessage("Failed to fetch forecast data. Please try again.");
+    setMessageType("error");
+    setLoading(false);
+  }
+};
 
   const fetchRegionalData = async () => {
     try {
@@ -263,283 +257,549 @@ function Admin_DemandForecast() {
     setComparisonData(comparisonArray);
   };
 
-  const calculateAccuracy = (predictedDemand, actualData) => {
-    if (!actualData.length) return null;
+  const calculateAccuracy = (predictedDemand, actualDataRaw) => {
+  if (!actualDataRaw || !actualDataRaw.length) return null;
 
-    // Sum the actual data for the last month
-    const lastMonth = new Date();
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    const lastMonthStart = new Date(
-      lastMonth.getFullYear(),
-      lastMonth.getMonth(),
-      1
-    );
-    const lastMonthEnd = new Date(
-      lastMonth.getFullYear(),
-      lastMonth.getMonth() + 1,
-      0
-    );
+  // Convert raw data to the same format as historicalData
+  const actualData = actualDataRaw.map((item) => {
+    const date = new Date(item.date);
+    return {
+      date: date.toLocaleDateString(),
+      timestamp: date.getTime(),
+      count: item.count,
+      month: date.toLocaleString("default", { month: "short" }),
+    };
+  });
 
-    const lastMonthData = actualData.filter((item) => {
-      const date = new Date(item.date);
-      return date >= lastMonthStart && date <= lastMonthEnd;
+  // Get the most recent month's data
+  const sortedData = actualData.sort((a, b) => b.timestamp - a.timestamp);
+  if (!sortedData.length) return null;
+
+  // Get the latest month
+  const latestDate = new Date(sortedData[0].timestamp);
+  const latestMonth = latestDate.getMonth();
+  const latestYear = latestDate.getFullYear();
+
+  // Sum all relocations from the latest month
+  const latestMonthData = sortedData.filter((item) => {
+    const itemDate = new Date(item.timestamp);
+    return (
+      itemDate.getMonth() === latestMonth &&
+      itemDate.getFullYear() === latestYear
+    );
+  });
+
+  const totalActual = latestMonthData.reduce((sum, item) => sum + item.count, 0);
+  
+  if (totalActual === 0) return null;
+
+  const accuracy = 100 - Math.abs(((totalActual - predictedDemand) / totalActual) * 100);
+  return Math.max(0, Math.min(100, Math.round(accuracy * 10) / 10)); // Ensure 0-100 range
+};
+
+ const generateNewForecast = async () => {
+  setIsGenerating(true);
+  try {
+    const res = await axios.get("http://127.0.0.1:8000/demand/forecasts/", {
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!lastMonthData.length) return null;
+    if (res.data.past_data) {
+      const histData = res.data.past_data
+        .map((item) => {
+          const date = new Date(item.date); // Use item.date instead of item.move_datetime
+          return {
+            date: date.toLocaleDateString(),
+            timestamp: date.getTime(),
+            count: item.count,
+            month: date.toLocaleString("default", { month: "short" }),
+            week: Math.ceil(date.getDate() / 7),
+          };
+        })
+        .sort((a, b) => a.timestamp - b.timestamp);
 
-    const totalActual = lastMonthData.reduce(
-      (sum, item) => sum + item.count,
-      0
-    );
-    const accuracy =
-      100 - Math.abs(((totalActual - predictedDemand) / totalActual) * 100);
+      setHistoricalData(histData);
 
-    return Math.round(accuracy * 10) / 10; // Round to 1 decimal place
-  };
-
-  const generateNewForecast = async () => {
-    setIsGenerating(true);
-    try {
-      const res = await axios.get("http://127.0.0.1:8000/demand/forecasts/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.data.past_data) {
-        const histData = res.data.past_data
-          .map((item) => {
-            const date = new Date(item.move_datetime);
-            return {
-              date: date.toLocaleDateString(),
-              timestamp: date.getTime(),
-              count: item.count,
-              month: date.toLocaleString("default", { month: "short" }),
-              week: Math.ceil(date.getDate() / 7),
-            };
-          })
-          .sort((a, b) => a.timestamp - b.timestamp);
-
-        setHistoricalData(histData);
-
-        // Process data for comparison chart
-        processComparisonData(histData, res.data.predicted_demand);
-      }
-
-      // Add the new forecast to the existing forecasts
-      const newForecast = {
-        id: Date.now(), // Temporary ID until we refetch
-        predicted_demand: res.data.predicted_demand,
-        forecast_date: new Date().toISOString().split("T")[0],
-        created_by: { phone_number: "You" }, // Placeholder
-        created_at: new Date().toLocaleString(),
-        accuracy: null, // New forecasts don't have accuracy yet
-      };
-
-      setForecastData((prevForecasts) => [newForecast, ...prevForecasts]);
-
-      setMessage("New demand forecast generated successfully!");
-      setMessageType("success");
-      setIsGenerating(false);
-
-      // Refresh the full data
-      fetchForecastData();
-    } catch (err) {
-      console.error("Error generating forecast:", err);
-      setMessage("Failed to generate new forecast. Please try again.");
-      setMessageType("error");
-      setIsGenerating(false);
+      // Process data for comparison chart
+      const predictedDemand = res.data.predictions?.monthly_demand || res.data.predicted_demand || 0;
+      processComparisonData(histData, predictedDemand);
     }
-  };
 
-  const handleDownload = {
-    PDF: () => {
-      const doc = new jsPDF();
-      doc.text("Demand Forecast Report", 14, 16);
+    // Add the new forecast to the existing forecasts
+    const newForecast = {
+      id: res.data.forecast_id || Date.now(),
+      predicted_demand: res.data.predictions?.monthly_demand || res.data.predicted_demand || 0, // Fix: use correct path
+      forecast_date: new Date().toISOString().split("T")[0],
+      created_by: { phone_number: "You" },
+      created_at: new Date().toLocaleString(),
+      accuracy: calculateAccuracy(
+        res.data.predictions?.monthly_demand || res.data.predicted_demand || 0, 
+        res.data.past_data || []
+      ),
+    };
+
+    setForecastData((prevForecasts) => [newForecast, ...prevForecasts]);
+
+    setMessage("New demand forecast generated successfully!");
+    setMessageType("success");
+    setIsGenerating(false);
+
+    // Don't call fetchForecastData again as we already have the new data
+  } catch (err) {
+    console.error("Error generating forecast:", err);
+    setMessage("Failed to generate new forecast. Please try again.");
+    setMessageType("error");
+    setIsGenerating(false);
+  }
+};
+
+const getImageBase64 = (imgPath) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      const dataURL = canvas.toDataURL('image/png');
+      resolve(dataURL);
+    };
+    img.onerror = () => {
+      console.warn('Could not load logo image');
+      resolve(null);
+    };
+    img.src = imgPath;
+  });
+};
+
+
+const handleDownload = {
+  // Helper function to convert image to base64
+
+// Updated PDF download function with logo
+PDF: async () => {
+  const doc = new jsPDF();
+  
+  try {
+    // Convert logo to base64
+    const logoBase64 = await getImageBase64(Logo);
+    
+    // Add logo if conversion was successful
+    if (logoBase64) {
+      // Add logo (adjust size and position as needed)
+      doc.addImage(logoBase64, 'PNG', 20, 10, 30, 30); // x, y, width, height
+      
+      // Adjust text positions to accommodate logo
+      doc.setFontSize(20);
+      doc.setTextColor(220, 38, 38); // Red color
+      doc.text("RELOCATION MANAGEMENT SYSTEM", 60, 20);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Demand Forecast Report", 60, 30);
+      
       doc.setFontSize(11);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
-      doc.text(`Total Forecasts: ${forecastData.length}`, 14, 28);
-
-      if (forecastData.length > 0) {
-        const tableData = forecastData.map((item) => [
-          new Date(item.forecast_date).toLocaleDateString(),
-          item.predicted_demand,
-          item.created_by?.phone_number || "System",
-          item.accuracy ? `${item.accuracy}%` : "N/A",
-        ]);
-
-        doc.autoTable({
-          head: [
-            ["Forecast Date", "Predicted Demand", "Created By", "Accuracy"],
-          ],
-          body: tableData,
-          startY: 35,
-        });
-      }
-
-      doc.save("demand_forecast.pdf");
-    },
-    Excel: () => {
-      const workbook = XLSX.utils.book_new();
-      const wsData = forecastData.map((item) => ({
-        "Forecast Date": new Date(item.forecast_date).toLocaleDateString(),
-        "Predicted Demand": item.predicted_demand,
-        "Created By": item.created_by?.phone_number || "System",
-        Accuracy: item.accuracy ? `${item.accuracy}%` : "N/A",
-        "Creation Time": item.created_at || "N/A",
-      }));
-
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(wsData),
-        "Demand Forecast"
-      );
-      XLSX.writeFile(workbook, "demand_forecast.xlsx");
-    },
-    CSV: () => {
-      const csvData = forecastData.map((item) => ({
-        date: new Date(item.forecast_date).toLocaleDateString(),
-        demand: item.predicted_demand,
-        creator: item.created_by?.phone_number || "System",
-        accuracy: item.accuracy ? `${item.accuracy}%` : "N/A",
-        created_at: item.created_at || "N/A",
-      }));
-
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        "Forecast Date,Predicted Demand,Created By,Accuracy,Creation Time\n" +
-        csvData
-          .map(
-            (row) =>
-              `${row.date},${row.demand},${row.creator},${row.accuracy},${row.created_at}`
-          )
-          .join("\n");
-
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "demand_forecast.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    },
-  };
-
-  const renderMetricsCards = () => {
-    // Calculate key metrics
-    const latestPrediction =
-      forecastData.length > 0 ? forecastData[0].predicted_demand : 0;
-    const totalHistorical = historicalData.reduce(
-      (sum, item) => sum + item.count,
-      0
-    );
-
-    const lastMonthDate = new Date();
-    lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 60, 40);
+      doc.text(`Report Period: ${new Date().toLocaleDateString()}`, 60, 47);
+    } else {
+      // Fallback if logo loading fails
+      doc.setFontSize(20);
+      doc.setTextColor(220, 38, 38);
+      doc.text("RELOCATION MANAGEMENT SYSTEM", 20, 20);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Demand Forecast Report", 20, 35);
+      
+      doc.setFontSize(11);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+      doc.text(`Report Period: ${new Date().toLocaleDateString()}`, 20, 52);
+    }
+    
+    // Add summary analysis
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Executive Summary", 20, 70);
+    
+    // Calculate metrics for summary
+    const latestPrediction = forecastData.length > 0 ? forecastData[0].predicted_demand : 0;
+    const totalHistorical = historicalData.reduce((sum, item) => sum + item.count, 0);
+    
+    const now = new Date();
+    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    
     const lastMonthDataPoints = historicalData.filter((item) => {
       const itemDate = new Date(item.date);
       return (
-        itemDate.getMonth() === lastMonthDate.getMonth() &&
-        itemDate.getFullYear() === lastMonthDate.getFullYear()
+        itemDate.getMonth() === lastMonth &&
+        itemDate.getFullYear() === lastMonthYear
       );
     });
+    
+    const lastMonthTotal = lastMonthDataPoints.reduce((sum, item) => sum + item.count, 0);
+    
+    const accuracyValues = forecastData
+      .filter((item) => item.accuracy !== null && item.accuracy !== undefined)
+      .map((item) => item.accuracy);
+    const avgAccuracy = accuracyValues.length > 0
+      ? (accuracyValues.reduce((sum, val) => sum + val, 0) / accuracyValues.length).toFixed(1)
+      : "N/A";
 
-    const lastMonthTotal = lastMonthDataPoints.reduce(
-      (sum, item) => sum + item.count,
-      0
-    );
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`• Predicted Demand for Next Month: ${latestPrediction} relocations`, 25, 85);
+    doc.text(`• Last Month's Actual Relocations: ${lastMonthTotal}`, 25, 92);
+    doc.text(`• Total Historical Relocations: ${totalHistorical}`, 25, 99);
+    doc.text(`• Average Forecast Accuracy: ${avgAccuracy}%`, 25, 106);
+    doc.text(`• Total Forecasts Generated: ${forecastData.length}`, 25, 113);
 
-    const twoMonthsAgoDate = new Date();
-    twoMonthsAgoDate.setMonth(twoMonthsAgoDate.getMonth() - 2);
-    const twoMonthsAgoDataPoints = historicalData.filter((item) => {
+    // Add some insights based on data
+    doc.setFontSize(12);
+    doc.setTextColor(220, 38, 38);
+    doc.text("Key Insights", 20, 130);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    // Generate insights based on data
+    const insights = [];
+    if (latestPrediction > lastMonthTotal) {
+      insights.push(`• Demand is expected to increase by ${((latestPrediction - lastMonthTotal) / lastMonthTotal * 100).toFixed(1)}% next month`);
+    } else if (latestPrediction < lastMonthTotal) {
+      insights.push(`• Demand is expected to decrease by ${((lastMonthTotal - latestPrediction) / lastMonthTotal * 100).toFixed(1)}% next month`);
+    } else {
+      insights.push('• Demand is expected to remain stable next month');
+    }
+    
+    if (avgAccuracy !== "N/A" && parseFloat(avgAccuracy) > 85) {
+      insights.push('• Forecast accuracy is high, indicating reliable predictions');
+    } else if (avgAccuracy !== "N/A" && parseFloat(avgAccuracy) < 70) {
+      insights.push('• Forecast accuracy could be improved with more historical data');
+    }
+    
+    insights.forEach((insight, index) => {
+      doc.text(insight, 25, 140 + (index * 7));
+    });
+
+    // Add forecast table
+    if (forecastData.length > 0) {
+      const tableData = forecastData.map((item) => [
+        new Date(item.forecast_date).toLocaleDateString(),
+        item.predicted_demand,
+        item.created_by?.phone_number || "System",
+        item.accuracy ? `${item.accuracy}%` : "N/A",
+      ]);
+
+      doc.autoTable({
+        head: [["Forecast Date", "Predicted Demand", "Created By", "Accuracy"]],
+        body: tableData,
+        startY: 160,
+        theme: 'grid',
+        headStyles: { 
+          fillColor: [220, 38, 38], // Red header
+          textColor: [255, 255, 255],
+          fontSize: 10,
+          fontStyle: 'bold'
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: [0, 0, 0]
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        }
+      });
+    }
+
+    // Add footer with logo on each page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      
+      // Add small logo in footer if available
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'PNG', 20, doc.internal.pageSize.height - 20, 10, 10);
+      }
+      
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Page ${i} of ${pageCount} - Generated by Relocation Management System`, 
+        logoBase64 ? 35 : 20, 
+        doc.internal.pageSize.height - 10
+      );
+      
+      // Add generation timestamp
+      doc.text(
+        `Generated: ${new Date().toLocaleString()}`, 
+        140, 
+        doc.internal.pageSize.height - 10
+      );
+    }
+
+    doc.save("demand_forecast_report.pdf");
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    
+    // Fallback PDF generation without logo
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.setTextColor(220, 38, 38);
+    doc.text("RELOCATION MANAGEMENT SYSTEM", 20, 20);
+    
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Demand Forecast Report", 20, 35);
+    
+    doc.setFontSize(11);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+    
+    // Add basic table
+    if (forecastData.length > 0) {
+      const tableData = forecastData.map((item) => [
+        new Date(item.forecast_date).toLocaleDateString(),
+        item.predicted_demand,
+        item.created_by?.phone_number || "System",
+        item.accuracy ? `${item.accuracy}%` : "N/A",
+      ]);
+
+      doc.autoTable({
+        head: [["Forecast Date", "Predicted Demand", "Created By", "Accuracy"]],
+        body: tableData,
+        startY: 60,
+      });
+    }
+    
+    doc.save("demand_forecast_report.pdf");
+  }
+},
+
+  Excel: () => {
+    const workbook = XLSX.utils.book_new();
+    
+    // Create summary sheet
+    const latestPrediction = forecastData.length > 0 ? forecastData[0].predicted_demand : 0;
+    const totalHistorical = historicalData.reduce((sum, item) => sum + item.count, 0);
+    
+    const now = new Date();
+    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    
+    const lastMonthDataPoints = historicalData.filter((item) => {
       const itemDate = new Date(item.date);
       return (
-        itemDate.getMonth() === twoMonthsAgoDate.getMonth() &&
-        itemDate.getFullYear() === twoMonthsAgoDate.getFullYear()
+        itemDate.getMonth() === lastMonth &&
+        itemDate.getFullYear() === lastMonthYear
       );
     });
-
-    const twoMonthsAgoTotal = twoMonthsAgoDataPoints.reduce(
-      (sum, item) => sum + item.count,
-      0
-    );
-
-    // Calculate growth rate
-    const growthRate =
-      twoMonthsAgoTotal > 0
-        ? (
-          ((lastMonthTotal - twoMonthsAgoTotal) / twoMonthsAgoTotal) *
-          100
-        ).toFixed(1)
-        : 0;
-
-    // Average accuracy of forecasts
+    
+    const lastMonthTotal = lastMonthDataPoints.reduce((sum, item) => sum + item.count, 0);
+    
     const accuracyValues = forecastData
-      .filter((item) => item.accuracy !== null)
+      .filter((item) => item.accuracy !== null && item.accuracy !== undefined)
       .map((item) => item.accuracy);
+    const avgAccuracy = accuracyValues.length > 0
+      ? (accuracyValues.reduce((sum, val) => sum + val, 0) / accuracyValues.length).toFixed(1)
+      : "N/A";
 
-    const avgAccuracy =
-      accuracyValues.length > 0
-        ? (
-          accuracyValues.reduce((sum, val) => sum + val, 0) /
-          accuracyValues.length
-        ).toFixed(1)
-        : "N/A";
+    const summaryData = [
+      { Metric: "Report Generated", Value: new Date().toLocaleDateString() },
+      { Metric: "Predicted Demand (Next Month)", Value: latestPrediction },
+      { Metric: "Last Month Relocations", Value: lastMonthTotal },
+      { Metric: "Total Historical Relocations", Value: totalHistorical },
+      { Metric: "Average Forecast Accuracy", Value: avgAccuracy + "%" },
+      { Metric: "Total Forecasts Generated", Value: forecastData.length },
+    ];
 
+    // Create forecast data sheet
+    const wsData = forecastData.map((item) => ({
+      "Forecast Date": new Date(item.forecast_date).toLocaleDateString(),
+      "Predicted Demand": item.predicted_demand,
+      "Created By": item.created_by?.phone_number || "System",
+      "Accuracy": item.accuracy ? `${item.accuracy}%` : "N/A",
+      "Creation Time": item.created_at || "N/A",
+    }));
+
+    // Add sheets to workbook
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryData), "Summary");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(wsData), "Demand Forecasts");
+    
+    // Add historical data sheet
+    const historicalSheetData = historicalData.map((item) => ({
+      "Date": item.date,
+      "Relocations": item.count,
+      "Month": item.month,
+      "Week": item.week,
+    }));
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(historicalSheetData), "Historical Data");
+
+    XLSX.writeFile(workbook, "demand_forecast_comprehensive_report.xlsx");
+  },
+
+  CSV: () => {
+    // Calculate summary metrics
+    const latestPrediction = forecastData.length > 0 ? forecastData[0].predicted_demand : 0;
+    const totalHistorical = historicalData.reduce((sum, item) => sum + item.count, 0);
+    
+    const now = new Date();
+    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    
+    const lastMonthDataPoints = historicalData.filter((item) => {
+      const itemDate = new Date(item.date);
+      return (
+        itemDate.getMonth() === lastMonth &&
+        itemDate.getFullYear() === lastMonthYear
+      );
+    });
+    
+    const lastMonthTotal = lastMonthDataPoints.reduce((sum, item) => sum + item.count, 0);
+    
+    const accuracyValues = forecastData
+      .filter((item) => item.accuracy !== null && item.accuracy !== undefined)
+      .map((item) => item.accuracy);
+    const avgAccuracy = accuracyValues.length > 0
+      ? (accuracyValues.reduce((sum, val) => sum + val, 0) / accuracyValues.length).toFixed(1)
+      : "N/A";
+
+    // Create comprehensive CSV with summary at top
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Add header and summary
+    csvContent += "RELOCATION MANAGEMENT SYSTEM - DEMAND FORECAST REPORT\n";
+    csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+    
+    csvContent += "EXECUTIVE SUMMARY\n";
+    csvContent += `Predicted Demand (Next Month),${latestPrediction}\n`;
+    csvContent += `Last Month Relocations,${lastMonthTotal}\n`;
+    csvContent += `Total Historical Relocations,${totalHistorical}\n`;
+    csvContent += `Average Forecast Accuracy,${avgAccuracy}%\n`;
+    csvContent += `Total Forecasts Generated,${forecastData.length}\n\n`;
+    
+    // Add forecast data
+    csvContent += "FORECAST HISTORY\n";
+    csvContent += "Forecast Date,Predicted Demand,Created By,Accuracy,Creation Time\n";
+    
+    forecastData.forEach((item) => {
+      csvContent += `${new Date(item.forecast_date).toLocaleDateString()},${item.predicted_demand},${item.created_by?.phone_number || "System"},${item.accuracy ? item.accuracy + "%" : "N/A"},${item.created_at || "N/A"}\n`;
+    });
+
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", "demand_forecast_comprehensive_report.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+};
+
+ const renderMetricsCards = () => {
+  // Calculate key metrics with better logic
+  const latestPrediction = forecastData.length > 0 ? forecastData[0].predicted_demand : 0;
+  const totalHistorical = historicalData.reduce((sum, item) => sum + item.count, 0);
+
+  // Fix last month calculation
+  const now = new Date();
+  const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1; // Handle January edge case
+  const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+
+  const lastMonthDataPoints = historicalData.filter((item) => {
+    const itemDate = new Date(item.date);
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
-          <div className="flex items-center justify-center text-red-400 mb-2 text-3xl">
-            <FontAwesomeIcon icon={faChartLine} />
-          </div>
-          <p className="text-gray-400 text-sm mb-1">Predicted Demand</p>
-          <h3 className="text-white text-2xl font-bold">{latestPrediction}</h3>
-          <p className="text-gray-400 text-xs mt-1">Relocations next month</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
-          <div className="flex items-center justify-center text-blue-400 mb-2 text-3xl">
-            <FontAwesomeIcon icon={faTruck} />
-          </div>
-          <p className="text-gray-400 text-sm mb-1">Last Month</p>
-          <h3 className="text-white text-2xl font-bold flex items-center justify-center">
-            {lastMonthTotal}
-            {growthRate > 0 ? (
-              <span className="ml-2 text-green-400 text-sm flex items-center">
-                <FontAwesomeIcon icon={faArrowUp} className="mr-1" />
-                {growthRate}%
-              </span>
-            ) : growthRate < 0 ? (
-              <span className="ml-2 text-red-400 text-sm flex items-center">
-                <FontAwesomeIcon icon={faArrowDown} className="mr-1" />
-                {Math.abs(growthRate)}%
-              </span>
-            ) : null}
-          </h3>
-          <p className="text-gray-400 text-xs mt-1">
-            Compared to previous month
-          </p>
-        </div>
-
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
-          <div className="flex items-center justify-center text-green-400 mb-2 text-3xl">
-            <FontAwesomeIcon icon={faProjectDiagram} />
-          </div>
-          <p className="text-gray-400 text-sm mb-1">Forecast Accuracy</p>
-          <h3 className="text-white text-2xl font-bold">
-            {avgAccuracy !== "N/A" ? avgAccuracy + "%" : "N/A"}
-          </h3>
-          <p className="text-gray-400 text-xs mt-1">Average of all forecasts</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
-          <div className="flex items-center justify-center text-yellow-400 mb-2 text-3xl">
-            <FontAwesomeIcon icon={faCalendarAlt} />
-          </div>
-          <p className="text-gray-400 text-sm mb-1">Total Relocations</p>
-          <h3 className="text-white text-2xl font-bold">{totalHistorical}</h3>
-          <p className="text-gray-400 text-xs mt-1">All-time completed moves</p>
-        </div>
-      </div>
+      itemDate.getMonth() === lastMonth &&
+      itemDate.getFullYear() === lastMonthYear
     );
-  };
+  });
+
+  const lastMonthTotal = lastMonthDataPoints.reduce((sum, item) => sum + item.count, 0);
+
+  // Fix two months ago calculation
+  const twoMonthsAgo = lastMonth === 0 ? 11 : lastMonth - 1;
+  const twoMonthsAgoYear = lastMonth === 0 ? lastMonthYear - 1 : lastMonthYear;
+
+  const twoMonthsAgoDataPoints = historicalData.filter((item) => {
+    const itemDate = new Date(item.date);
+    return (
+      itemDate.getMonth() === twoMonthsAgo &&
+      itemDate.getFullYear() === twoMonthsAgoYear
+    );
+  });
+
+  const twoMonthsAgoTotal = twoMonthsAgoDataPoints.reduce((sum, item) => sum + item.count, 0);
+
+  // Calculate growth rate
+  const growthRate = twoMonthsAgoTotal > 0
+    ? ((lastMonthTotal - twoMonthsAgoTotal) / twoMonthsAgoTotal * 100).toFixed(1)
+    : 0;
+
+  // Average accuracy of forecasts
+  const accuracyValues = forecastData
+    .filter((item) => item.accuracy !== null && item.accuracy !== undefined)
+    .map((item) => item.accuracy);
+
+  const avgAccuracy = accuracyValues.length > 0
+    ? (accuracyValues.reduce((sum, val) => sum + val, 0) / accuracyValues.length).toFixed(1)
+    : "N/A";
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
+        <div className="flex items-center justify-center text-red-400 mb-2 text-3xl">
+          <FontAwesomeIcon icon={faChartLine} />
+        </div>
+        <p className="text-gray-400 text-sm mb-1">Predicted Demand</p>
+        <h3 className="text-white text-2xl font-bold">{latestPrediction}</h3>
+        <p className="text-gray-400 text-xs mt-1">Relocations next month</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
+        <div className="flex items-center justify-center text-blue-400 mb-2 text-3xl">
+          <FontAwesomeIcon icon={faTruck} />
+        </div>
+        <p className="text-gray-400 text-sm mb-1">Last Month</p>
+        <h3 className="text-white text-2xl font-bold flex items-center justify-center">
+          {lastMonthTotal}
+          {growthRate > 0 ? (
+            <span className="ml-2 text-green-400 text-sm flex items-center">
+              <FontAwesomeIcon icon={faArrowUp} className="mr-1" />
+              {growthRate}%
+            </span>
+          ) : growthRate < 0 ? (
+            <span className="ml-2 text-red-400 text-sm flex items-center">
+              <FontAwesomeIcon icon={faArrowDown} className="mr-1" />
+              {Math.abs(growthRate)}%
+            </span>
+          ) : null}
+        </h3>
+        <p className="text-gray-400 text-xs mt-1">Compared to previous month</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
+        <div className="flex items-center justify-center text-green-400 mb-2 text-3xl">
+          <FontAwesomeIcon icon={faProjectDiagram} />
+        </div>
+        <p className="text-gray-400 text-sm mb-1">Forecast Accuracy</p>
+        <h3 className="text-white text-2xl font-bold">
+          {avgAccuracy !== "N/A" ? avgAccuracy + "%" : "N/A"}
+        </h3>
+        <p className="text-gray-400 text-xs mt-1">Average of all forecasts</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-lg shadow-lg border border-gray-700 text-center">
+        <div className="flex items-center justify-center text-yellow-400 mb-2 text-3xl">
+          <FontAwesomeIcon icon={faCalendarAlt} />
+        </div>
+        <p className="text-gray-400 text-sm mb-1">Total Relocations</p>
+        <h3 className="text-white text-2xl font-bold">{totalHistorical}</h3>
+        <p className="text-gray-400 text-xs mt-1">All-time completed moves</p>
+      </div>
+    </div>
+  );
+};
 
   const renderTabs = () => {
     return (

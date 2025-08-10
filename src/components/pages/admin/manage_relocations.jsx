@@ -340,249 +340,391 @@ function Admin_Manage_Relocations() {
     }
   };
 
-  const handleDownload = {
-    PDF: () => {
-      const doc = new jsPDF();
+const handleDownload = {
+  PDF: () => {
+    const doc = new jsPDF();
+    
+    // Add logo to the top left corner
+    const logoWidth = 30;
+    const logoHeight = 15;
+    doc.addImage(Logo, "PNG", 10, 10, logoWidth, logoHeight);
+    
+    // Header with company name and system title
+    doc.setFontSize(12);
+    doc.setTextColor(220, 38, 38); // Red color matching your theme
+    doc.text("RELOCATION MANAGEMENT SYSTEM", 50, 15);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Relocation Management Report", 50, 20);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 50, 25);
+    
+    // Add red line separator
+    doc.setDrawColor(220, 38, 38);
+    doc.setLineWidth(0.5);
+    doc.line(10, 30, 200, 30);
+    
+    // Report Title
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text("RELOCATION MANAGEMENT REPORT", 105, 40, { align: "center" });
+    
+    // Executive Summary Section
+    doc.setFontSize(12);
+    doc.setTextColor(220, 38, 38);
+    doc.text("Executive Summary", 14, 55);
+    
+    // Create summary table
+    const summaryData = [
+      ["Metric", "Value"],
+      ["Total Relocations", filteredData.length.toString()],
+      ["Approved Relocations", filteredData.filter(r => r.status === "completed").length.toString()],
+      ["Rejected Relocations", filteredData.filter(r => r.status === "canceled").length.toString()],
+      ["Pending Relocations", filteredData.filter(r => r.status === "pending").length.toString()],
+      ["In Progress", filteredData.filter(r => r.status === "in_progress").length.toString()],
+    ];
+    
+    doc.autoTable({
+      startY: 60,
+      head: [summaryData[0]],
+      body: summaryData.slice(1),
+      theme: "grid",
+      headStyles: {
+        fillColor: [220, 38, 38],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+      },
+      bodyStyles: {
+        fontSize: 9,
+      },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 30, halign: "center" },
+      },
+      margin: { left: 14, right: 14 },
+    });
+    
+    // Key Insights Section
+    let currentY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(12);
+    doc.setTextColor(220, 38, 38);
+    doc.text("Key Insights", 14, currentY);
+    
+    // Calculate insights
+    const totalRevenue = filteredData.reduce((sum, r) => sum + Number(r.adjusted_cost || 0), 0);
+    const avgCost = filteredData.length > 0 ? totalRevenue / filteredData.length : 0;
+    const completionRate = filteredData.length > 0 ? 
+      (filteredData.filter(r => r.status === "completed").length / filteredData.length * 100) : 0;
+    
+    // Most popular destination
+    const destinationCounts = filteredData.reduce((acc, r) => {
+      const dest = r.destination_district;
+      acc[dest] = (acc[dest] || 0) + 1;
+      return acc;
+    }, {});
+    const mostPopularDest = Object.entries(destinationCounts)
+      .sort((a, b) => b[1] - a[1])[0];
+    
+    const insights = [
+      `• Total revenue generated: FRW${totalRevenue.toFixed(2)}`,
+      `• Average cost per relocation: FRW${avgCost.toFixed(2)}`,
+      `• Completion rate: ${completionRate.toFixed(1)}%`,
+      `• Most popular destination: ${mostPopularDest ? mostPopularDest[0] : 'N/A'} (${mostPopularDest ? mostPopularDest[1] : 0} relocations)`,
+    ];
+    
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    insights.forEach((insight, index) => {
+      doc.text(insight, 14, currentY + 8 + (index * 5));
+    });
+    
+    // Relocation Details Section
+    currentY = currentY + 35;
+    doc.setFontSize(12);
+    doc.setTextColor(220, 38, 38);
+    doc.text("Relocation Details", 14, currentY);
+    
+    const headers = [
+      "ID",
+      "Owner",
+      "Origin", 
+      "Destination",
+      "Status",
+      "Move Date",
+      "Cost",
+    ];
+    
+    const data = filteredData.map((relocation) => [
+      relocation.id.toString(),
+      relocation.created_by?.phone_number || 'N/A',
+      `${relocation.origin_sector}, ${relocation.origin_district}`,
+      `${relocation.destination_sector}, ${relocation.destination_district}`,
+      relocation.status.charAt(0).toUpperCase() + relocation.status.slice(1),
+      new Date(relocation.move_datetime).toLocaleDateString(),
+      `$${Number(relocation.adjusted_cost || 0).toFixed(2)}`,
+    ]);
+    
+    doc.autoTable({
+      startY: currentY + 5,
+      head: [headers],
+      body: data,
+      theme: "grid",
+      headStyles: {
+        fillColor: [220, 38, 38],
+        textColor: [255, 255, 255],
+        fontSize: 8,
+      },
+      bodyStyles: {
+        fontSize: 7,
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 40 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 25 },
+        6: { cellWidth: 20 },
+      },
+    });
+    
+    // Add footer with page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        `Relocation Management System - Driver Report - Page ${i} of ${pageCount}`,
+        105,
+        285,
+        { align: "center" }
+      );
+    }
+    
+    doc.save(`relocation_report_${new Date().toISOString().split('T')[0]}.pdf`);
+  },
 
-      // Add logo to the top left corner
-      const logoWidth = 30;
-      const logoHeight = 15;
-      doc.addImage(Logo, "PNG", 10, 10, logoWidth, logoHeight);
+  Excel: () => {
+    const workbook = XLSX.utils.book_new();
+    
+    // Calculate metrics for summary
+    const totalRevenue = filteredData.reduce((sum, r) => sum + Number(r.adjusted_cost || 0), 0);
+    const avgCost = filteredData.length > 0 ? totalRevenue / filteredData.length : 0;
+    const completionRate = filteredData.length > 0 ? 
+      (filteredData.filter(r => r.status === "completed").length / filteredData.length * 100) : 0;
+    
+    // Executive Summary sheet
+    const summaryData = [
+      ["RELOCATION MANAGEMENT SYSTEM"],
+      ["Driver Management Report"],
+      [""],
+      [`Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`],
+      [""],
+      ["EXECUTIVE SUMMARY"],
+      [""],
+      ["Metric", "Value"],
+      ["Total Relocations", filteredData.length],
+      ["Approved Relocations", filteredData.filter(r => r.status === "completed").length],
+      ["Rejected Relocations", filteredData.filter(r => r.status === "canceled").length],
+      ["Pending Relocations", filteredData.filter(r => r.status === "pending").length],
+      ["In Progress", filteredData.filter(r => r.status === "in_progress").length],
+      [""],
+      ["KEY INSIGHTS"],
+      [""],
+      ["Total Revenue Generated", `FRW${totalRevenue.toFixed(2)}`],
+      ["Average Cost per Relocation", `FRW${avgCost.toFixed(2)}`],
+      ["Completion Rate", `${completionRate.toFixed(1)}%`],
+      [""],
+      ["RELOCATION DETAILS"],
+    ];
 
-      // Add title and header (shifted down to accommodate logo)
-      doc.setFontSize(18);
-      doc.setTextColor(40, 40, 40);
-      doc.text("Relocation Management Report", 105, 25, { align: "center" });
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet(summaryData),
+      "Executive Summary"
+    );
 
-      doc.setFontSize(12);
-      doc.text(`From: ${new Date().toLocaleDateString()}`, 14, 35);
-      doc.text(`To: ${new Date().toLocaleDateString()}`, 14, 40);
-      doc.text("Type: Comprehensive Relocation Analysis", 14, 45);
+    // Filtered Data sheet
+    const headers = [
+      "ID",
+      "Owner Phone",
+      "Owner Email",
+      "Origin District",
+      "Origin Sector", 
+      "Destination District",
+      "Destination Sector",
+      "Status",
+      "Move Date",
+      "Base Cost",
+      "Adjusted Cost",
+      "Payment Status",
+      "Vehicle Plate",
+      "Driver Contact",
+      "Relocation Size"
+    ];
 
-      // Add summary statistics (adjusted y positions)
-      doc.setFontSize(14);
-      doc.text("Summary Statistics", 14, 55);
+    const data = filteredData.map((relocation) => [
+      relocation.id,
+      relocation.created_by?.phone_number || 'N/A',
+      relocation.created_by?.email || 'N/A',
+      relocation.origin_district,
+      relocation.origin_sector,
+      relocation.destination_district,
+      relocation.destination_sector,
+      relocation.status.charAt(0).toUpperCase() + relocation.status.slice(1),
+      new Date(relocation.move_datetime).toLocaleDateString(),
+      Number(relocation.base_cost || 0).toFixed(2),
+      Number(relocation.adjusted_cost || 0).toFixed(2),
+      relocation.is_paid ? "Paid" : "Unpaid",
+      relocation.vehicle?.plate_number || "N/A",
+      relocation.driver?.user?.phone_number || relocation.driver?.driving_license_number || "N/A",
+      relocation.relocation_size
+    ]);
 
-      const totalRelocations = relocations.length;
-      const pendingRelocations = relocations.filter(
-        (r) => r.status === "pending"
-      ).length;
-      const completedRelocations = relocations.filter(
-        (r) => r.status === "completed"
-      ).length;
-      const inProgressRelocations = relocations.filter(
-        (r) => r.status === "in_progress"
-      ).length;
-      const canceledRelocations = relocations.filter(
-        (r) => r.status === "canceled"
-      ).length;
-
-      doc.setFontSize(11);
-      doc.text(`Total Relocations: ${totalRelocations}`, 20, 65);
-      doc.text(`Pending: ${pendingRelocations}`, 20, 70);
-      doc.text(`In Progress: ${inProgressRelocations}`, 20, 75);
-      doc.text(`Completed: ${completedRelocations}`, 20, 80);
-      doc.text(`Canceled: ${canceledRelocations}`, 20, 85);
-
-      // Add relocation data table (adjusted startY)
-      doc.setFontSize(14);
-      doc.text("Relocation Details", 14, 95);
-
-      const headers = [
-        "ID",
-        "Origin",
-        "Destination",
-        "Size",
-        "Status",
-        "Move Date",
-        "Cost",
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([headers, ...data]),
+      "Filtered Relocation Data"
+    );
+    
+    // Status Analysis sheet
+    const statusAnalysis = [
+      ["STATUS ANALYSIS"],
+      [""],
+      ["Status", "Count", "Percentage", "Revenue"],
+    ];
+    
+    const statusBreakdown = ["pending", "in_progress", "completed", "canceled"].map(status => {
+      const statusData = filteredData.filter(r => r.status === status);
+      const statusRevenue = statusData.reduce((sum, r) => sum + Number(r.adjusted_cost || 0), 0);
+      const percentage = filteredData.length > 0 ? (statusData.length / filteredData.length * 100) : 0;
+      
+      return [
+        status.charAt(0).toUpperCase() + status.slice(1),
+        statusData.length,
+        `${percentage.toFixed(1)}%`,
+        `$${statusRevenue.toFixed(2)}`
       ];
+    });
+    
+    statusAnalysis.push(...statusBreakdown);
+    
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet(statusAnalysis),
+      "Status Analysis"
+    );
 
-      const data = relocations.map((relocation) => [
+    XLSX.writeFile(workbook, `relocation_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  },
+
+  CSV: () => {
+    // Calculate metrics
+    const totalRevenue = filteredData.reduce((sum, r) => sum + Number(r.adjusted_cost || 0), 0);
+    const avgCost = filteredData.length > 0 ? totalRevenue / filteredData.length : 0;
+    const completionRate = filteredData.length > 0 ? 
+      (filteredData.filter(r => r.status === "completed").length / filteredData.length * 100) : 0;
+    
+    // Create enhanced CSV content
+    let csvContent = "RELOCATION MANAGEMENT SYSTEM\n";
+    csvContent += "Driver Management Report\n";
+    csvContent += `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n\n`;
+    
+    csvContent += "EXECUTIVE SUMMARY\n";
+    csvContent += "Metric,Value\n";
+    csvContent += `Total Relocations,${filteredData.length}\n`;
+    csvContent += `Approved Relocations,${filteredData.filter(r => r.status === "completed").length}\n`;
+    csvContent += `Rejected Relocations,${filteredData.filter(r => r.status === "canceled").length}\n`;
+    csvContent += `Pending Relocations,${filteredData.filter(r => r.status === "pending").length}\n`;
+    csvContent += `In Progress,${filteredData.filter(r => r.status === "in_progress").length}\n\n`;
+    
+    csvContent += "KEY INSIGHTS\n";
+    csvContent += `Total Revenue Generated,$${totalRevenue.toFixed(2)}\n`;
+    csvContent += `Average Cost per Relocation,$${avgCost.toFixed(2)}\n`;
+    csvContent += `Completion Rate,${completionRate.toFixed(1)}%\n\n`;
+    
+    // Most popular destination
+    const destinationCounts = filteredData.reduce((acc, r) => {
+      const dest = r.destination_district;
+      acc[dest] = (acc[dest] || 0) + 1;
+      return acc;
+    }, {});
+    const mostPopularDest = Object.entries(destinationCounts)
+      .sort((a, b) => b[1] - a[1])[0];
+    
+    if (mostPopularDest) {
+      csvContent += `Most Popular Destination,${mostPopularDest[0]} (${mostPopularDest[1]} relocations)\n\n`;
+    }
+    
+    // Relocation Details
+    csvContent += "RELOCATION DETAILS\n";
+    const headers = [
+      "ID",
+      "Owner Phone", 
+      "Owner Email",
+      "Origin District",
+      "Origin Sector",
+      "Destination District", 
+      "Destination Sector",
+      "Status",
+      "Move Date",
+      "Base Cost",
+      "Adjusted Cost",
+      "Payment Status",
+      "Vehicle Plate",
+      "Driver Contact",
+      "Relocation Size"
+    ].join(",");
+
+    csvContent += headers + "\n";
+
+    filteredData.forEach((relocation) => {
+      csvContent += [
         relocation.id,
-        `${relocation.origin_sector}, ${relocation.origin_district}`,
-        `${relocation.destination_sector}, ${relocation.destination_district}`,
-        relocation.relocation_size,
-        relocation.status,
+        `"${relocation.created_by?.phone_number || 'N/A'}"`,
+        `"${relocation.created_by?.email || 'N/A'}"`,
+        `"${relocation.origin_district}"`,
+        `"${relocation.origin_sector}"`,
+        `"${relocation.destination_district}"`,
+        `"${relocation.destination_sector}"`,
+        relocation.status.charAt(0).toUpperCase() + relocation.status.slice(1),
         new Date(relocation.move_datetime).toLocaleDateString(),
-        `$${Number(relocation.adjusted_cost).toFixed(2)}`,
-      ]);
-
-      doc.autoTable({
-        startY: 100, // Adjusted start position
-        head: [headers],
-        body: data,
-        theme: "grid",
-        headStyles: {
-          fillColor: [255, 0, 0], // Red header
-          textColor: [255, 255, 255],
-        },
-        alternateRowStyles: {
-          fillColor: [240, 240, 240],
-        },
-      });
-
-      // Add footer
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(10);
-        doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: "center" });
-        doc.text(`Printed on: ${new Date().toLocaleDateString()}`, 105, 290, {
-          align: "center",
-        });
-      }
-
-      doc.save("relocation_report.pdf");
-    },
-
-    Excel: () => {
-      const workbook = XLSX.utils.book_new();
-
-      // Summary sheet
-      const summaryData = [
-        ["Relocation Management Report"],
-        [""],
-        ["From:", new Date().toLocaleDateString()],
-        ["To:", new Date().toLocaleDateString()],
-        ["Type:", "Comprehensive Relocation Analysis"],
-        [""],
-        ["Summary Statistics"],
-        ["Total Relocations:", relocations.length],
-        ["Pending:", relocations.filter((r) => r.status === "pending").length],
-        [
-          "Completed:",
-          relocations.filter((r) => r.status === "completed").length,
-        ],
-        [
-          "In Progress:",
-          relocations.filter((r) => r.status === "in_progress").length,
-        ],
-        [
-          "Canceled:",
-          relocations.filter((r) => r.status === "canceled").length,
-        ],
-        [""],
-        ["Relocation Details"],
-      ];
-
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.aoa_to_sheet(summaryData),
-        "Summary"
-      );
-
-      // Data sheet
-      const headers = [
-        "ID",
-        "Origin District",
-        "Origin Sector",
-        "Destination District",
-        "Destination Sector",
-        "Size",
-        "Status",
-        "Move Date",
-        "Cost",
-        "Vehicle",
-        "Driver",
-      ];
-
-      const data = relocations.map((relocation) => [
-        relocation.id,
-        relocation.origin_district,
-        relocation.origin_sector,
-        relocation.destination_district,
-        relocation.destination_sector,
+        Number(relocation.base_cost || 0).toFixed(2),
+        Number(relocation.adjusted_cost || 0).toFixed(2),
+        relocation.is_paid ? "Paid" : "Unpaid",
+        `"${relocation.vehicle?.plate_number || "N/A"}"`,
+        `"${relocation.driver?.user?.phone_number || relocation.driver?.driving_license_number || "N/A"}"`,
         relocation.relocation_size,
-        relocation.status,
-        new Date(relocation.move_datetime).toLocaleDateString(),
-        Number(relocation.adjusted_cost).toFixed(2),
-        relocation.vehicle?.plate_number || "N/A",
-        relocation.driver?.user?.phone_number ||
-          relocation.driver?.driving_license_number ||
-          "N/A",
-      ]);
+      ].join(",") + "\n";
+    });
+    
+    // Add status breakdown
+    csvContent += "\n\nSTATUS ANALYSIS\n";
+    csvContent += "Status,Count,Percentage,Revenue\n";
+    
+    ["pending", "in_progress", "completed", "canceled"].forEach(status => {
+      const statusData = filteredData.filter(r => r.status === status);
+      const statusRevenue = statusData.reduce((sum, r) => sum + Number(r.adjusted_cost || 0), 0);
+      const percentage = filteredData.length > 0 ? (statusData.length / filteredData.length * 100) : 0;
+      
+      csvContent += `${status.charAt(0).toUpperCase() + status.slice(1)},${statusData.length},${percentage.toFixed(1)}%,$${statusRevenue.toFixed(2)}\n`;
+    });
 
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.aoa_to_sheet([headers, ...data]),
-        "Relocation Data"
-      );
-
-      XLSX.writeFile(workbook, "relocation_report.xlsx");
-    },
-
-    CSV: () => {
-      // Create summary section
-      let csvContent = "Relocation Management Report\n\n";
-      csvContent += `From:,${new Date().toLocaleDateString()}\n`;
-      csvContent += `To:,${new Date().toLocaleDateString()}\n`;
-      csvContent += "Type:,Comprehensive Relocation Analysis\n\n";
-
-      // Add summary statistics
-      csvContent += "Summary Statistics\n";
-      csvContent += `Total Relocations:,${relocations.length}\n`;
-      csvContent += `Pending:,${
-        relocations.filter((r) => r.status === "pending").length
-      }\n`;
-      csvContent += `Completed:,${
-        relocations.filter((r) => r.status === "completed").length
-      }\n`;
-      csvContent += `In Progress:,${
-        relocations.filter((r) => r.status === "in_progress").length
-      }\n`;
-      csvContent += `Canceled:,${
-        relocations.filter((r) => r.status === "canceled").length
-      }\n\n`;
-
-      // Add relocation data
-      csvContent += "Relocation Details\n";
-      const headers = [
-        "ID",
-        "Origin District",
-        "Origin Sector",
-        "Destination District",
-        "Destination Sector",
-        "Size",
-        "Status",
-        "Move Date",
-        "Cost",
-        "Vehicle",
-        "Driver",
-      ].join(",");
-
-      csvContent += headers + "\n";
-
-      relocations.forEach((relocation) => {
-        csvContent +=
-          [
-            relocation.id,
-            `"${relocation.origin_district}"`,
-            `"${relocation.origin_sector}"`,
-            `"${relocation.destination_district}"`,
-            `"${relocation.destination_sector}"`,
-            relocation.relocation_size,
-            relocation.status,
-            new Date(relocation.move_datetime).toLocaleDateString(),
-            Number(relocation.adjusted_cost).toFixed(2),
-            relocation.vehicle?.plate_number || "N/A",
-            relocation.driver?.user?.phone_number ||
-              relocation.driver?.driving_license_number ||
-              "N/A",
-          ].join(",") + "\n";
-      });
-
-      const link = document.createElement("a");
-      link.setAttribute(
-        "href",
-        "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent)
-      );
-      link.setAttribute("download", "relocation_report.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    },
-  };
+    const link = document.createElement("a");
+    link.setAttribute(
+      "href",
+      "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent)
+    );
+    link.setAttribute("download", `relocation_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
+};
   // Add this function after the handleAddUpdateRelocation function
   // This will create summary stat cards to display at the top of the page
 

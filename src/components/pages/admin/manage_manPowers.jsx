@@ -47,6 +47,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import Logo from "../../../assets/pictures/logo.png";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -750,35 +751,404 @@ function Admin_Manage_Man_Powers() {
     }
   };
 
-  const handleDownload = {
-    PDF: () => {
-      const doc = new jsPDF();
-      doc.autoTable({ html: "#man_power-table" });
-      doc.save("man_powers.pdf");
-    },
-    Excel: () => {
+
+const [logoBase64, setLogoBase64] = useState(null);
+
+// Add this useEffect to convert logo to base64
+useEffect(() => {
+  const convertImageToBase64 = (imageSrc) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.height = this.naturalHeight;
+        canvas.width = this.naturalWidth;
+        ctx.drawImage(this, 0, 0);
+        const dataURL = canvas.toDataURL();
+        resolve(dataURL);
+      };
+      img.onerror = reject;
+      img.src = imageSrc;
+    });
+  };
+
+  convertImageToBase64(Logo)
+    .then(base64 => setLogoBase64(base64))
+    .catch(err => console.error('Error converting logo:', err));
+}, []);
+
+// Helper functions for insights and analysis
+const getMostCommonGender = () => {
+  if (filteredAndSortedman_powers.length === 0) return 'N/A';
+  
+  const genders = {};
+  filteredAndSortedman_powers.forEach(manpower => {
+    genders[manpower.gender] = (genders[manpower.gender] || 0) + 1;
+  });
+  
+  const mostCommon = Object.entries(genders).sort((a, b) => b[1] - a[1])[0];
+  return mostCommon ? `${mostCommon[0]} (${mostCommon[1]} people)` : 'N/A';
+};
+
+const getMostCommonResidence = () => {
+  if (filteredAndSortedman_powers.length === 0) return 'N/A';
+  
+  const residences = {};
+  filteredAndSortedman_powers.forEach(manpower => {
+    if (manpower.residence) {
+      residences[manpower.residence] = (residences[manpower.residence] || 0) + 1;
+    }
+  });
+  
+  const mostCommon = Object.entries(residences).sort((a, b) => b[1] - a[1])[0];
+  return mostCommon ? `${mostCommon[0]} (${mostCommon[1]} people)` : 'N/A';
+};
+
+const getApprovalRate = () => {
+  if (filteredAndSortedman_powers.length === 0) return '0%';
+  
+  const approvedCount = filteredAndSortedman_powers.filter(mp => mp.status === 'approved').length;
+  const rate = (approvedCount / filteredAndSortedman_powers.length * 100).toFixed(1);
+  return `${rate}% (${approvedCount}/${filteredAndSortedman_powers.length})`;
+};
+
+const getActiveRate = () => {
+  if (filteredAndSortedman_powers.length === 0) return '0%';
+  
+  const activeCount = filteredAndSortedman_powers.filter(mp => mp.availability_status === 'active').length;
+  const rate = (activeCount / filteredAndSortedman_powers.length * 100).toFixed(1);
+  return `${rate}% (${activeCount}/${filteredAndSortedman_powers.length})`;
+};
+
+// Replace your existing handleDownload object with this enhanced version
+const handleDownload = {
+  PDF: () => {
+    const doc = new jsPDF();
+    
+    try {
+      // Add logo if available
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'PNG', 20, 10, 40, 20);
+      }
+      
+      // Add company header
+      doc.setFontSize(16);
+      doc.setTextColor(220, 53, 69); // Red color similar to your theme
+      doc.text('RELOCATION MANAGEMENT SYSTEM', 20, 40);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Man Power Management Report', 20, 50);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 60);
+      
+      // Add summary section
+      doc.setFontSize(14);
+      doc.setTextColor(220, 53, 69);
+      doc.text('Executive Summary', 20, 80);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      
+      const summaryTableData = [
+        ['Metric', 'Value'],
+        ['Total Man Power', filteredAndSortedman_powers.length.toString()],
+        ['Approved Personnel', filteredAndSortedman_powers.filter(mp => mp.status === 'approved').length.toString()],
+        ['Rejected Personnel', filteredAndSortedman_powers.filter(mp => mp.status === 'rejected').length.toString()],
+        ['Active Personnel', filteredAndSortedman_powers.filter(mp => mp.availability_status === 'active').length.toString()],
+        ['Inactive Personnel', filteredAndSortedman_powers.filter(mp => mp.availability_status === 'inactive').length.toString()],
+        ['Approval Rate', getApprovalRate()],
+        ['Active Rate', getActiveRate()]
+      ];
+      
+      doc.autoTable({
+        startY: 90,
+        head: [summaryTableData[0]],
+        body: summaryTableData.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [220, 53, 69], textColor: 255 },
+        styles: { fontSize: 9 },
+        margin: { left: 20 },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { cellWidth: 50 }
+        }
+      });
+      
+      // Add key insights
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(14);
+      doc.setTextColor(220, 53, 69);
+      doc.text('Key Insights', 20, finalY);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      
+      const insights = [
+        `• Total personnel registered: ${filteredAndSortedman_powers.length}`,
+        `• Approval rate: ${getApprovalRate()}`,
+        `• Active personnel rate: ${getActiveRate()}`,
+        `• Most common gender: ${getMostCommonGender()}`,
+        `• Most common residence: ${getMostCommonResidence()}`
+      ];
+      
+      insights.forEach((insight, index) => {
+        doc.text(insight, 25, finalY + 15 + (index * 8));
+      });
+      
+      // Add detailed table on new page if needed
+      const tableStartY = finalY + 70;
+      if (tableStartY > 250) {
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.setTextColor(220, 53, 69);
+        doc.text('Man Power Details', 20, 30);
+        
+        // Prepare table data
+        const tableData = filteredAndSortedman_powers.map(manpower => [
+          `${manpower.first_name} ${manpower.last_name}`,
+          manpower.gender,
+          manpower.phone_number,
+          manpower.email || 'N/A',
+          manpower.residence || 'N/A',
+          manpower.status,
+          manpower.availability_status
+        ]);
+        
+        doc.autoTable({
+          startY: 40,
+          head: [['Full Name', 'Gender', 'Phone', 'Email', 'Residence', 'Status', 'Availability']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { 
+            fillColor: [220, 53, 69], 
+            textColor: 255,
+            fontSize: 8
+          },
+          styles: { 
+            fontSize: 7,
+            cellPadding: 2
+          },
+          columnStyles: {
+            0: { cellWidth: 30 }, // Name
+            1: { cellWidth: 15 }, // Gender
+            2: { cellWidth: 25 }, // Phone
+            3: { cellWidth: 35 }, // Email
+            4: { cellWidth: 25 }, // Residence
+            5: { cellWidth: 20 }, // Status
+            6: { cellWidth: 20 }  // Availability
+          }
+        });
+      } else {
+        doc.setFontSize(14);
+        doc.setTextColor(220, 53, 69);
+        doc.text('Man Power Details', 20, tableStartY);
+        
+        // Prepare table data
+        const tableData = filteredAndSortedman_powers.map(manpower => [
+          `${manpower.first_name} ${manpower.last_name}`,
+          manpower.gender,
+          manpower.phone_number,
+          manpower.email || 'N/A',
+          manpower.residence || 'N/A',
+          manpower.status,
+          manpower.availability_status
+        ]);
+        
+        doc.autoTable({
+          startY: tableStartY + 10,
+          head: [['Full Name', 'Gender', 'Phone', 'Email', 'Residence', 'Status', 'Availability']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { 
+            fillColor: [220, 53, 69], 
+            textColor: 255,
+            fontSize: 8
+          },
+          styles: { 
+            fontSize: 7,
+            cellPadding: 2
+          },
+          columnStyles: {
+            0: { cellWidth: 30 }, // Name
+            1: { cellWidth: 15 }, // Gender
+            2: { cellWidth: 25 }, // Phone
+            3: { cellWidth: 35 }, // Email
+            4: { cellWidth: 25 }, // Residence
+            5: { cellWidth: 20 }, // Status
+            6: { cellWidth: 20 }  // Availability
+          }
+        });
+      }
+      
+      // Add footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Relocation Management System - Page ${i} of ${pageCount}`, 
+                 20, doc.internal.pageSize.height - 10);
+      }
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      setMessage('Error generating PDF report');
+      setMessageType('error');
+    }
+    
+    doc.save(`manpower_report_${new Date().toISOString().split('T')[0]}.pdf`);
+    setMessage('PDF report generated successfully!');
+    setMessageType('success');
+  },
+
+  Excel: () => {
+    try {
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(man_powersData),
-        "man_powers"
-      );
-      XLSX.writeFile(workbook, "man_powers.xlsx");
-    },
-    CSV: () => {
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        Object.keys(man_powersData[0]).join(",") +
-        "\n" +
-        man_powersData.map((row) => Object.values(row).join(",")).join("\n");
+      
+      // Summary Sheet
+      const summaryData = [
+        ['RELOCATION MANAGEMENT SYSTEM'],
+        ['Man Power Management Report'],
+        [`Generated on: ${new Date().toLocaleDateString()}`],
+        [''],
+        ['EXECUTIVE SUMMARY'],
+        ['Metric', 'Value'],
+        ['Total Man Power', filteredAndSortedman_powers.length],
+        ['Approved Personnel', filteredAndSortedman_powers.filter(mp => mp.status === 'approved').length],
+        ['Rejected Personnel', filteredAndSortedman_powers.filter(mp => mp.status === 'rejected').length],
+        ['Active Personnel', filteredAndSortedman_powers.filter(mp => mp.availability_status === 'active').length],
+        ['Inactive Personnel', filteredAndSortedman_powers.filter(mp => mp.availability_status === 'inactive').length],
+        ['Approval Rate', getApprovalRate()],
+        ['Active Rate', getActiveRate()],
+        [''],
+        ['KEY INSIGHTS'],
+        [`Total personnel registered: ${filteredAndSortedman_powers.length}`],
+        [`Personnel approval rate: ${getApprovalRate()}`],
+        [`Active personnel rate: ${getActiveRate()}`],
+        [`Most common gender: ${getMostCommonGender()}`],
+        [`Most common residence: ${getMostCommonResidence()}`]
+      ];
+      
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+      
+      // Detailed Data Sheet
+      const detailedData = filteredAndSortedman_powers.map(manpower => ({
+        'Full Name': `${manpower.first_name} ${manpower.last_name}`,
+        'First Name': manpower.first_name,
+        'Last Name': manpower.last_name,
+        'Gender': manpower.gender,
+        'Phone Number': manpower.phone_number,
+        'Email': manpower.email || 'N/A',
+        'National ID': manpower.national_id_number,
+        'Residence': manpower.residence || 'N/A',
+        'Status': manpower.status,
+        'Availability Status': manpower.availability_status,
+        'Created Date': manpower.created_at ? new Date(manpower.created_at).toLocaleDateString() : 'N/A',
+        'Updated Date': manpower.updated_at ? new Date(manpower.updated_at).toLocaleDateString() : 'N/A'
+      }));
+      
+      const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
+      XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Data');
+      
+      // Status Analysis Sheet
+      const statusAnalysis = ['approved', 'rejected'].map(status => ({
+        'Status': status.charAt(0).toUpperCase() + status.slice(1),
+        'Count': filteredAndSortedman_powers.filter(mp => mp.status === status).length,
+        'Percentage': `${((filteredAndSortedman_powers.filter(mp => mp.status === status).length / filteredAndSortedman_powers.length) * 100).toFixed(1)}%`
+      }));
+      
+      const statusSheet = XLSX.utils.json_to_sheet(statusAnalysis);
+      XLSX.utils.book_append_sheet(workbook, statusSheet, 'Status Analysis');
+      
+      // Gender Analysis Sheet
+      const genderAnalysis = ['male', 'female', 'other'].map(gender => ({
+        'Gender': gender.charAt(0).toUpperCase() + gender.slice(1),
+        'Count': filteredAndSortedman_powers.filter(mp => mp.gender === gender).length,
+        'Percentage': `${((filteredAndSortedman_powers.filter(mp => mp.gender === gender).length / filteredAndSortedman_powers.length) * 100).toFixed(1)}%`
+      }));
+      
+      const genderSheet = XLSX.utils.json_to_sheet(genderAnalysis);
+      XLSX.utils.book_append_sheet(workbook, genderSheet, 'Gender Analysis');
+      
+      // Availability Analysis Sheet
+      const availabilityAnalysis = ['active', 'inactive'].map(availability => ({
+        'Availability': availability.charAt(0).toUpperCase() + availability.slice(1),
+        'Count': filteredAndSortedman_powers.filter(mp => mp.availability_status === availability).length,
+        'Percentage': `${((filteredAndSortedman_powers.filter(mp => mp.availability_status === availability).length / filteredAndSortedman_powers.length) * 100).toFixed(1)}%`
+      }));
+      
+      const availabilitySheet = XLSX.utils.json_to_sheet(availabilityAnalysis);
+      XLSX.utils.book_append_sheet(workbook, availabilitySheet, 'Availability Analysis');
+      
+      XLSX.writeFile(workbook, `manpower_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
+      setMessage('Excel report generated successfully!');
+      setMessageType('success');
+    } catch (error) {
+      console.error('Error generating Excel:', error);
+      setMessage('Error generating Excel report');
+      setMessageType('error');
+    }
+  },
+
+  CSV: () => {
+    try {
+      // Prepare enhanced CSV with summary at the top
+      const summaryRows = [
+        ['RELOCATION MANAGEMENT SYSTEM'],
+        [`Generated on: ${new Date().toLocaleDateString()}`],
+        [''],
+        ['EXECUTIVE SUMMARY'],
+        ['Total Man Power', filteredAndSortedman_powers.length],
+        ['Approved Personnel', filteredAndSortedman_powers.filter(mp => mp.status === 'approved').length],
+        ['Rejected Personnel', filteredAndSortedman_powers.filter(mp => mp.status === 'rejected').length],
+        ['Active Personnel', filteredAndSortedman_powers.filter(mp => mp.availability_status === 'active').length],
+        ['Inactive Personnel', filteredAndSortedman_powers.filter(mp => mp.availability_status === 'inactive').length],
+        ['Approval Rate', getApprovalRate()],
+        ['Active Rate', getActiveRate()],
+        ['Most Common Gender', getMostCommonGender()],
+        ['Most Common Residence', getMostCommonResidence()],
+        [''],
+        ['DETAILED DATA'],
+        ['Full Name', 'Gender', 'Phone Number', 'Email', 'National ID', 'Residence', 'Status', 'Availability Status', 'Created Date']
+      ];
+      
+      const dataRows = filteredAndSortedman_powers.map(manpower => [
+        `"${manpower.first_name} ${manpower.last_name}"`,
+        manpower.gender,
+        manpower.phone_number,
+        manpower.email || 'N/A',
+        manpower.national_id_number,
+        `"${manpower.residence || 'N/A'}"`,
+        manpower.status,
+        manpower.availability_status,
+        manpower.created_at ? new Date(manpower.created_at).toLocaleDateString() : 'N/A'
+      ]);
+      
+      const allRows = [...summaryRows, ...dataRows];
+      const csvContent = "data:text/csv;charset=utf-8," + 
+        allRows.map(row => row.join(",")).join("\n");
+      
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "man_powers.csv");
+      link.setAttribute("download", `manpower_report_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-    },
-  };
+      
+      setMessage('CSV report generated successfully!');
+      setMessageType('success');
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      setMessage('Error generating CSV report');
+      setMessageType('error');
+    }
+  }
+};
+
 
   const handleman_powerSubmit = async (e) => {
     e.preventDefault();

@@ -40,6 +40,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import Logo from "../../../assets/pictures/logo.png";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -186,35 +187,256 @@ function Admin_Manage_Feedbacks() {
     }
   };
 
-  const handleDownload = {
-    PDF: () => {
-      const doc = new jsPDF();
-      doc.autoTable({ html: "#feedback-table" });
-      doc.save("feedbacks.pdf");
-    },
-    Excel: () => {
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(feedbackData),
-        "Feedbacks"
-      );
-      XLSX.writeFile(workbook, "feedbacks.xlsx");
-    },
-    CSV: () => {
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        Object.keys(feedbackData[0]).join(",") +
-        "\n" +
-        feedbackData.map((row) => Object.values(row).join(",")).join("\n");
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "feedbacks.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    },
-  };
+// Replace the existing handleDownload object in your component with this enhanced version
+
+const handleDownload = {
+  PDF: () => {
+    const doc = new jsPDF();
+    
+    // Add logo (you'll need to convert your logo to base64 or use a URL)
+    // For now, I'll show you how to add it - you may need to convert your Logo import to base64
+    try {
+      // If you have the logo as base64, uncomment and use this:
+      doc.addImage(Logo, 'PNG', 20, 10, 40, 20);
+      
+      // Add company header
+      doc.setFontSize(16);
+      doc.setTextColor(220, 53, 69); // Red color similar to your theme
+      doc.text('RELOCATION MANAGEMENT SYSTEM', 20, 40);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Relocation Management Report', 20, 50);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 60);
+      
+      // Add summary section
+      doc.setFontSize(14);
+      doc.setTextColor(220, 53, 69);
+      doc.text('Executive Summary', 20, 80);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      
+      const summaryData = [
+        ['Metric', 'Value'],
+        ['Total Relocations', filteredData.length.toString()],
+        ['Average Rating', summaryStats.averageRating],
+        ['Approved Relocations', filteredData.filter(f => f.rating >= 4).length.toString()],
+        ['Pending Relocations', filteredData.filter(f => f.rating === 3).length.toString()],
+        ['Declined Relocations', filteredData.filter(f => f.rating < 3).length.toString()]
+      ];
+      
+      doc.autoTable({
+        startY: 90,
+        head: [summaryData[0]],
+        body: summaryData.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [220, 53, 69], textColor: 255 },
+        styles: { fontSize: 9 },
+        margin: { left: 20 }
+      });
+      
+      // Add key insights
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(14);
+      doc.setTextColor(220, 53, 69);
+      doc.text('Key Insights', 20, finalY);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      
+      const insights = [
+        `• Total feedback generated: ${filteredData.length}`,
+        `• Average user rating: ${summaryStats.averageRating}/5.0`,
+        `• Most popular destination: ${getMostPopularDestination()}`,
+        `• Peak feedback period: ${getPeakPeriod()}`
+      ];
+      
+      insights.forEach((insight, index) => {
+        doc.text(insight, 25, finalY + 15 + (index * 8));
+      });
+      
+      // Add detailed table
+      const tableStartY = finalY + 60;
+      doc.setFontSize(14);
+      doc.setTextColor(220, 53, 69);
+      doc.text('Relocation Details', 20, tableStartY);
+      
+      // Prepare table data
+      const tableData = filteredData.map(feedback => [
+        feedback.rating.toString(),
+        feedback.comment.substring(0, 30) + (feedback.comment.length > 30 ? '...' : ''),
+        feedback.created_by?.phone_number || 'N/A',
+        feedback.relocation ? `${feedback.relocation.start_point} to ${feedback.relocation.end_point}` : 'N/A',
+        new Date(feedback.created_at).toLocaleDateString()
+      ]);
+      
+      doc.autoTable({
+        startY: tableStartY + 10,
+        head: [['Rating', 'Comment', 'User Phone', 'Route', 'Date']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [220, 53, 69], 
+          textColor: 255,
+          fontSize: 9
+        },
+        styles: { 
+          fontSize: 8,
+          cellPadding: 3
+        },
+        columnStyles: {
+          1: { cellWidth: 40 }, // Comment column wider
+          3: { cellWidth: 45 }   // Route column wider
+        }
+      });
+      
+      // Add footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Relocation Management System - Page ${i} of ${pageCount}`, 
+                 20, doc.internal.pageSize.height - 10);
+      }
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+    
+    doc.save(`relocation_report_${new Date().toISOString().split('T')[0]}.pdf`);
+  },
+
+  Excel: () => {
+    const workbook = XLSX.utils.book_new();
+    
+    // Summary Sheet
+    const summaryData = [
+      ['RELOCATION MANAGEMENT SYSTEM'],
+      ['Relocation Management Report'],
+      [`Generated on: ${new Date().toLocaleDateString()}`],
+      [''],
+      ['EXECUTIVE SUMMARY'],
+      ['Metric', 'Value'],
+      ['Total Feedbacks', filteredData.length],
+      ['Average Rating', summaryStats.averageRating],
+      ['High Rated (4-5 stars)', filteredData.filter(f => f.rating >= 4).length],
+      ['Medium Rated (3 stars)', filteredData.filter(f => f.rating === 3).length],
+      ['Low Rated (1-2 stars)', filteredData.filter(f => f.rating < 3).length],
+      [''],
+      ['KEY INSIGHTS'],
+      [`Total feedback entries: ${filteredData.length}`],
+      [`Average user satisfaction: ${summaryStats.averageRating}/5.0`],
+      [`Most popular route: ${getMostPopularDestination()}`],
+      [`Peak feedback period: ${getPeakPeriod()}`]
+    ];
+    
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    
+    // Style the summary sheet headers
+    summarySheet['A1'] = { v: 'RELOCATION MANAGEMENT SYSTEM', t: 's', s: { font: { bold: true, sz: 16 } } };
+    summarySheet['A5'] = { v: 'EXECUTIVE SUMMARY', t: 's', s: { font: { bold: true, sz: 14 } } };
+    summarySheet['A13'] = { v: 'KEY INSIGHTS', t: 's', s: { font: { bold: true, sz: 14 } } };
+    
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+    
+    // Detailed Data Sheet
+    const detailedData = filteredData.map(feedback => ({
+      'Rating': feedback.rating,
+      'Comment': feedback.comment,
+      'User Phone': feedback.created_by?.phone_number || 'N/A',
+      'User Email': feedback.created_by?.email || 'N/A',
+      'Start Point': feedback.relocation?.start_point || 'N/A',
+      'End Point': feedback.relocation?.end_point || 'N/A',
+      'Route': feedback.relocation ? `${feedback.relocation.start_point} to ${feedback.relocation.end_point}` : 'N/A',
+      'Date Created': new Date(feedback.created_at).toLocaleDateString(),
+      'Time': new Date(feedback.created_at).toLocaleTimeString()
+    }));
+    
+    const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
+    XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Data');
+    
+    // Rating Analysis Sheet
+    const ratingAnalysis = [1, 2, 3, 4, 5].map(rating => ({
+      'Rating': `${rating} Star${rating > 1 ? 's' : ''}`,
+      'Count': filteredData.filter(f => f.rating === rating).length,
+      'Percentage': `${((filteredData.filter(f => f.rating === rating).length / filteredData.length) * 100).toFixed(1)}%`
+    }));
+    
+    const ratingSheet = XLSX.utils.json_to_sheet(ratingAnalysis);
+    XLSX.utils.book_append_sheet(workbook, ratingSheet, 'Rating Analysis');
+    
+    XLSX.writeFile(workbook, `relocation_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  },
+
+  CSV: () => {
+    // Prepare enhanced CSV with summary at the top
+    const summaryRows = [
+      ['RELOCATION MANAGEMENT SYSTEM'],
+      [`Generated on: ${new Date().toLocaleDateString()}`],
+      [''],
+      ['EXECUTIVE SUMMARY'],
+      ['Total Feedbacks', filteredData.length],
+      ['Average Rating', summaryStats.averageRating],
+      ['High Rated (4-5)', filteredData.filter(f => f.rating >= 4).length],
+      ['Medium Rated (3)', filteredData.filter(f => f.rating === 3).length],
+      ['Low Rated (1-2)', filteredData.filter(f => f.rating < 3).length],
+      [''],
+      ['DETAILED DATA'],
+      ['Rating', 'Comment', 'User Phone', 'User Email', 'Route', 'Date']
+    ];
+    
+    const dataRows = filteredData.map(feedback => [
+      feedback.rating,
+      `"${feedback.comment.replace(/"/g, '""')}"`, // Escape quotes in CSV
+      feedback.created_by?.phone_number || 'N/A',
+      feedback.created_by?.email || 'N/A',
+      feedback.relocation ? `${feedback.relocation.start_point} to ${feedback.relocation.end_point}` : 'N/A',
+      new Date(feedback.created_at).toLocaleDateString()
+    ]);
+    
+    const allRows = [...summaryRows, ...dataRows];
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      allRows.map(row => row.join(",")).join("\n");
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `relocation_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+};
+
+// Helper functions for insights
+const getMostPopularDestination = () => {
+  if (filteredData.length === 0) return 'N/A';
+  
+  const destinations = {};
+  filteredData.forEach(feedback => {
+    if (feedback.relocation) {
+      const route = `${feedback.relocation.start_point} to ${feedback.relocation.end_point}`;
+      destinations[route] = (destinations[route] || 0) + 1;
+    }
+  });
+  
+  const mostPopular = Object.entries(destinations).sort((a, b) => b[1] - a[1])[0];
+  return mostPopular ? `${mostPopular[0]} (${mostPopular[1]} feedbacks)` : 'N/A';
+};
+
+const getPeakPeriod = () => {
+  if (filteredData.length === 0) return 'N/A';
+  
+  const months = {};
+  filteredData.forEach(feedback => {
+    const month = new Date(feedback.created_at).toLocaleString('default', { month: 'long', year: 'numeric' });
+    months[month] = (months[month] || 0) + 1;
+  });
+  
+  const peakMonth = Object.entries(months).sort((a, b) => b[1] - a[1])[0];
+  return peakMonth ? `${peakMonth[0]} (${peakMonth[1]} feedbacks)` : 'N/A';
+};
 
   const handleAddUpdateFeedback = async (e) => {
     e.preventDefault();

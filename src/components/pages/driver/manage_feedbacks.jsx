@@ -186,35 +186,35 @@ function Driver_Manage_Feedbacks() {
     }
   };
 
-  const handleDownload = {
-    PDF: () => {
-      const doc = new jsPDF();
-      doc.autoTable({ html: "#feedback-table" });
-      doc.save("feedbacks.pdf");
-    },
-    Excel: () => {
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(feedbackData),
-        "Feedbacks"
-      );
-      XLSX.writeFile(workbook, "feedbacks.xlsx");
-    },
-    CSV: () => {
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        Object.keys(feedbackData[0]).join(",") +
-        "\n" +
-        feedbackData.map((row) => Object.values(row).join(",")).join("\n");
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "feedbacks.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    },
-  };
+  // const handleDownload = {
+  //   PDF: () => {
+  //     const doc = new jsPDF();
+  //     doc.autoTable({ html: "#feedback-table" });
+  //     doc.save("feedbacks.pdf");
+  //   },
+  //   Excel: () => {
+  //     const workbook = XLSX.utils.book_new();
+  //     XLSX.utils.book_append_sheet(
+  //       workbook,
+  //       XLSX.utils.json_to_sheet(feedbackData),
+  //       "Feedbacks"
+  //     );
+  //     XLSX.writeFile(workbook, "feedbacks.xlsx");
+  //   },
+  //   CSV: () => {
+  //     const csvContent =
+  //       "data:text/csv;charset=utf-8," +
+  //       Object.keys(feedbackData[0]).join(",") +
+  //       "\n" +
+  //       feedbackData.map((row) => Object.values(row).join(",")).join("\n");
+  //     const link = document.createElement("a");
+  //     link.setAttribute("href", encodeURI(csvContent));
+  //     link.setAttribute("download", "feedbacks.csv");
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     link.remove();
+  //   },
+  // };
 
   const handleAddUpdateFeedback = async (e) => {
     e.preventDefault();
@@ -926,7 +926,7 @@ function Driver_Manage_Feedbacks() {
                 </div>
               </div>
 
-              <div className="relative">
+              {/* <div className="relative">
                 <button
                   onClick={() => setDownloadMenuVisible(!downloadMenuVisible)}
                   className="flex items-center px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition"
@@ -954,7 +954,7 @@ function Driver_Manage_Feedbacks() {
                     </div>
                   </div>
                 )}
-              </div>
+              </div> */}
 
               <button
                 onClick={() => openModal()}

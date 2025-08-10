@@ -47,6 +47,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import Logo from "../../../assets/pictures/logo.png";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -92,6 +93,7 @@ function Admin_Manage_Drivers() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -870,35 +872,344 @@ function Admin_Manage_Drivers() {
     }
   };
 
-  const handleDownload = {
-    PDF: () => {
-      const doc = new jsPDF();
-      doc.autoTable({ html: "#driver-table" });
-      doc.save("drivers.pdf");
-    },
-    Excel: () => {
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(driversData),
-        "Drivers"
+// Replace the existing handleDownload object with this enhanced version
+
+// Helper function to convert image to base64
+const getImageBase64 = (src) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      const dataURL = canvas.toDataURL('image/png');
+      resolve(dataURL);
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+};
+
+const handleDownload = {
+  PDF: async () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // Add Logo
+    try {
+      const logoBase64 = await getImageBase64(Logo);
+      doc.addImage(logoBase64, 'PNG', 15, 10, 25, 20);
+    } catch (error) {
+      console.log('Logo conversion failed, using placeholder');
+      // Fallback placeholder
+      doc.setFillColor(220, 38, 38);
+      doc.rect(15, 10, 25, 20, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('RMS', 27.5, 22, { align: 'center' });
+    }
+
+    // Header - Company Info (positioned next to logo)
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('RELOCATION MANAGEMENT SYSTEM', 45, 18);
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text('Driver Management Report', 45, 26);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 45, 32);
+
+    // Report Title (centered)
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('DRIVER MANAGEMENT REPORT', pageWidth / 2, 45, { align: 'center' });
+
+    // Summary Section
+    const summaryY = 55;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('Executive Summary', 15, summaryY);
+
+    // Summary data calculations
+    const totalDrivers = filteredAndSortedDrivers.length;
+    const approvedDrivers = filteredAndSortedDrivers.filter(driver => driver.status === 'approved').length;
+    const rejectedDrivers = filteredAndSortedDrivers.filter(driver => driver.status === 'rejected').length;
+    const activeDrivers = filteredAndSortedDrivers.filter(driver => driver.availability_status === 'active').length;
+    const inactiveDrivers = filteredAndSortedDrivers.filter(driver => driver.availability_status === 'inactive').length;
+
+    // Calculate driving categories distribution
+    const categoriesCount = {};
+    filteredAndSortedDrivers.forEach(driver => {
+      driver.driving_categories.forEach(category => {
+        categoriesCount[category] = (categoriesCount[category] || 0) + 1;
+      });
+    });
+
+    // Summary statistics
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const summaryData = [
+      ['Total Drivers', totalDrivers.toString()],
+      ['Approved Drivers', `${approvedDrivers} (${((approvedDrivers / totalDrivers) * 100).toFixed(1)}%)`],
+      ['Rejected Drivers', `${rejectedDrivers} (${((rejectedDrivers / totalDrivers) * 100).toFixed(1)}%)`],
+      ['Active Drivers', `${activeDrivers} (${((activeDrivers / totalDrivers) * 100).toFixed(1)}%)`],
+      ['Inactive Drivers', `${inactiveDrivers} (${((inactiveDrivers / totalDrivers) * 100).toFixed(1)}%)`]
+    ];
+
+    // Create summary table
+    doc.autoTable({
+      head: [['Metric', 'Value']],
+      body: summaryData,
+      startY: summaryY + 10,
+      theme: 'grid',
+      headStyles: { fillColor: [220, 38, 38], textColor: 255, fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 60, halign: 'center' }
+      },
+      margin: { left: 15, right: 15 }
+    });
+
+    // Key Insights
+    let currentY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('Key Insights', 15, currentY);
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    currentY += 10;
+
+    const insights = [
+      `• Driver approval rate: ${((approvedDrivers / totalDrivers) * 100).toFixed(1)}%`,
+      `• Driver activity rate: ${((activeDrivers / totalDrivers) * 100).toFixed(1)}%`,
+      `• Most common driving category: ${Object.keys(categoriesCount).reduce((a, b) => categoriesCount[a] > categoriesCount[b] ? a : b, 'N/A')}`,
+      `• Total driving categories covered: ${Object.keys(categoriesCount).length}`
+    ];
+
+    insights.forEach(insight => {
+      if (currentY > pageHeight - 30) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.text(insight, 20, currentY);
+      currentY += 6;
+    });
+
+    // Add some space before the table
+    currentY += 10;
+    if (currentY > pageHeight - 60) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    // Driver Details Table
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('Driver Details', 15, currentY);
+
+    // Prepare table data
+    const tableColumns = [
+      { header: 'Name', dataKey: 'name' },
+      { header: 'Phone', dataKey: 'phone' },
+      { header: 'Categories', dataKey: 'categories' },
+      { header: 'Status', dataKey: 'status' },
+      { header: 'Availability', dataKey: 'availability' },
+      { header: 'Residence', dataKey: 'residence' }
+    ];
+
+    const tableData = filteredAndSortedDrivers.map(driver => ({
+      name: `${driver.first_name} ${driver.last_name}`,
+      phone: driver.phone_number,
+      categories: driver.driving_categories.join(', '),
+      status: driver.status.toUpperCase(),
+      availability: driver.availability_status.toUpperCase(),
+      residence: driver.residence
+    }));
+
+    doc.autoTable({
+      columns: tableColumns,
+      body: tableData,
+      startY: currentY + 5,
+      theme: 'striped',
+      headStyles: { 
+        fillColor: [220, 38, 38], 
+        textColor: 255, 
+        fontSize: 9,
+        fontStyle: 'bold'
+      },
+      bodyStyles: { 
+        fontSize: 8,
+        cellPadding: 3
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 20, halign: 'center' },
+        4: { cellWidth: 25, halign: 'center' },
+        5: { cellWidth: 35 }
+      },
+      margin: { left: 15, right: 15 },
+      showHead: 'everyPage'
+    });
+
+    // Footer on every page
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Relocation Management System - Driver Report - Page ${i} of ${totalPages}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: 'center' }
       );
-      XLSX.writeFile(workbook, "drivers.xlsx");
-    },
-    CSV: () => {
-      const csvContent =
-        "data:text/csv;charset=utf-8," +
-        Object.keys(driversData[0]).join(",") +
-        "\n" +
-        driversData.map((row) => Object.values(row).join(",")).join("\n");
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "drivers.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    },
-  };
+    }
+
+    // Save the PDF
+    const fileName = `drivers_report_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  },
+
+  Excel: () => {
+    // Create workbook with multiple sheets
+    const workbook = XLSX.utils.book_new();
+
+    // Summary Sheet
+    const summaryData = [
+      ['RELOCATION MANAGEMENT SYSTEM'],
+      ['Driver Management Report'],
+      [`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`],
+      [''],
+      ['EXECUTIVE SUMMARY'],
+      [''],
+      ['Metric', 'Value', 'Percentage'],
+      ['Total Drivers', filteredAndSortedDrivers.length, '100%'],
+      ['Approved Drivers', filteredAndSortedDrivers.filter(d => d.status === 'approved').length, `${((filteredAndSortedDrivers.filter(d => d.status === 'approved').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`],
+      ['Rejected Drivers', filteredAndSortedDrivers.filter(d => d.status === 'rejected').length, `${((filteredAndSortedDrivers.filter(d => d.status === 'rejected').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`],
+      ['Active Drivers', filteredAndSortedDrivers.filter(d => d.availability_status === 'active').length, `${((filteredAndSortedDrivers.filter(d => d.availability_status === 'active').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`],
+      ['Inactive Drivers', filteredAndSortedDrivers.filter(d => d.availability_status === 'inactive').length, `${((filteredAndSortedDrivers.filter(d => d.availability_status === 'inactive').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`]
+    ];
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    
+    // Style the summary sheet
+    summarySheet['!merges'] = [
+      { s: { c: 0, r: 0 }, e: { c: 2, r: 0 } },
+      { s: { c: 0, r: 1 }, e: { c: 2, r: 1 } },
+      { s: { c: 0, r: 2 }, e: { c: 2, r: 2 } },
+      { s: { c: 0, r: 4 }, e: { c: 2, r: 4 } }
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+    // Driver Details Sheet
+    const driverDetailsData = filteredAndSortedDrivers.map(driver => ({
+      'First Name': driver.first_name,
+      'Last Name': driver.last_name,
+      'Phone Number': driver.phone_number,
+      'Email': driver.email,
+      'Gender': driver.gender,
+      'Driving Categories': driver.driving_categories.join(', '),
+      'National ID': driver.national_id_number,
+      'License Number': driver.driving_license_number,
+      'Residence': driver.residence,
+      'Status': driver.status.toUpperCase(),
+      'Availability': driver.availability_status.toUpperCase()
+    }));
+
+    const driverSheet = XLSX.utils.json_to_sheet(driverDetailsData);
+    XLSX.utils.book_append_sheet(workbook, driverSheet, 'Driver Details');
+
+    // Categories Analysis Sheet
+    const categoriesCount = {};
+    filteredAndSortedDrivers.forEach(driver => {
+      driver.driving_categories.forEach(category => {
+        categoriesCount[category] = (categoriesCount[category] || 0) + 1;
+      });
+    });
+
+    const categoriesData = Object.entries(categoriesCount).map(([category, count]) => ({
+      'Driving Category': category,
+      'Number of Drivers': count,
+      'Percentage': `${((count / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`
+    }));
+
+    const categoriesSheet = XLSX.utils.json_to_sheet(categoriesData);
+    XLSX.utils.book_append_sheet(workbook, categoriesSheet, 'Categories Analysis');
+
+    // Save the Excel file
+    const fileName = `drivers_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  },
+
+  CSV: () => {
+    // Create comprehensive CSV with summary
+    const csvRows = [];
+    
+    // Header information
+    csvRows.push(['RELOCATION MANAGEMENT SYSTEM - Driver Management Report']);
+    csvRows.push([`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`]);
+    csvRows.push(['']);
+    
+    // Summary section
+    csvRows.push(['EXECUTIVE SUMMARY']);
+    csvRows.push(['Metric', 'Value', 'Percentage']);
+    csvRows.push(['Total Drivers', filteredAndSortedDrivers.length, '100%']);
+    csvRows.push(['Approved Drivers', filteredAndSortedDrivers.filter(d => d.status === 'approved').length, `${((filteredAndSortedDrivers.filter(d => d.status === 'approved').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`]);
+    csvRows.push(['Rejected Drivers', filteredAndSortedDrivers.filter(d => d.status === 'rejected').length, `${((filteredAndSortedDrivers.filter(d => d.status === 'rejected').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`]);
+    csvRows.push(['Active Drivers', filteredAndSortedDrivers.filter(d => d.availability_status === 'active').length, `${((filteredAndSortedDrivers.filter(d => d.availability_status === 'active').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`]);
+    csvRows.push(['Inactive Drivers', filteredAndSortedDrivers.filter(d => d.availability_status === 'inactive').length, `${((filteredAndSortedDrivers.filter(d => d.availability_status === 'inactive').length / filteredAndSortedDrivers.length) * 100).toFixed(1)}%`]);
+    csvRows.push(['']);
+    
+    // Driver details header
+    csvRows.push(['DRIVER DETAILS']);
+    csvRows.push(['First Name', 'Last Name', 'Phone Number', 'Email', 'Gender', 'Driving Categories', 'National ID', 'License Number', 'Residence', 'Status', 'Availability']);
+    
+    // Driver data
+    filteredAndSortedDrivers.forEach(driver => {
+      csvRows.push([
+        driver.first_name,
+        driver.last_name,
+        driver.phone_number,
+        driver.email,
+        driver.gender,
+        driver.driving_categories.join('; '),
+        driver.national_id_number,
+        driver.driving_license_number,
+        driver.residence,
+        driver.status.toUpperCase(),
+        driver.availability_status.toUpperCase()
+      ]);
+    });
+
+    // Convert to CSV format
+    const csvContent = csvRows.map(row => 
+      row.map(field => `"${field}"`).join(',')
+    ).join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `drivers_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};
 
   const handleDriverSubmit = async (e) => {
     e.preventDefault();
@@ -964,49 +1275,66 @@ function Admin_Manage_Drivers() {
 };
 
 
-  const renderDownloadDropdown = () => (
-    <div className="relative">
-      <button
-        onClick={() => setDownloadMenuVisible(!downloadMenuVisible)}
-        className="bg-gray-800 text-gray-300 px-4 py-2 rounded flex items-center"
-      >
+const renderDownloadDropdown = () => (
+  <div className="relative">
+    <button
+      onClick={() => setDownloadMenuVisible(!downloadMenuVisible)}
+      className="bg-gray-800 text-gray-300 px-4 py-2 rounded flex items-center hover:bg-gray-700 transition"
+      disabled={isDownloading}
+    >
+      {isDownloading ? (
+        <FontAwesomeIcon icon={faSpinner} spin className="mr-2" />
+      ) : (
         <FontAwesomeIcon icon={faDownload} className="mr-2" />
-        Download
-      </button>
-      {downloadMenuVisible && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-50">
-          <button
-            onClick={() => {
-              handleDownload.PDF();
-              setDownloadMenuVisible(false);
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-300 flex items-center"
-          >
-            <FontAwesomeIcon icon={faFile} className="mr-2" /> PDF
-          </button>
-          <button
-            onClick={() => {
-              handleDownload.Excel();
-              setDownloadMenuVisible(false);
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-300 flex items-center"
-          >
-            <FontAwesomeIcon icon={faFileExcel} className="mr-2" /> Excel
-          </button>
-          <button
-            onClick={() => {
-              handleDownload.CSV();
-              setDownloadMenuVisible(false);
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-300 flex items-center"
-          >
-            <FontAwesomeIcon icon={faFileCsv} className="mr-2" /> CSV
-          </button>
-        </div>
       )}
-    </div>
-  );
-
+      {isDownloading ? 'Generating...' : 'Download'}
+    </button>
+    {downloadMenuVisible && !isDownloading && (
+      <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-50">
+        <button
+          onClick={async () => {
+            setIsDownloading(true);
+            setDownloadMenuVisible(false);
+            try {
+              await handleDownload.PDF();
+              setMessage('PDF downloaded successfully');
+              setMessageType('success');
+            } catch (error) {
+              setMessage('Error generating PDF');
+              setMessageType('error');
+            }
+            setIsDownloading(false);
+          }}
+          className="w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-300 flex items-center"
+        >
+          <FontAwesomeIcon icon={faFile} className="mr-2" /> PDF Report
+        </button>
+        <button
+          onClick={() => {
+            handleDownload.Excel();
+            setDownloadMenuVisible(false);
+            setMessage('Excel file downloaded successfully');
+            setMessageType('success');
+          }}
+          className="w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-300 flex items-center"
+        >
+          <FontAwesomeIcon icon={faFileExcel} className="mr-2" /> Excel Workbook
+        </button>
+        <button
+          onClick={() => {
+            handleDownload.CSV();
+            setDownloadMenuVisible(false);
+            setMessage('CSV file downloaded successfully');
+            setMessageType('success');
+          }}
+          className="w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-300 flex items-center"
+        >
+          <FontAwesomeIcon icon={faFileCsv} className="mr-2" /> CSV Data
+        </button>
+      </div>
+    )}
+  </div>
+);
   return (
     <div className="container mx-auto p-4 bg-gray-950 min-h-screen text-gray-300">
       {renderSummaryCards()}
